@@ -257,15 +257,56 @@ open System
             compare [(10, 30)] [(10, 20)] |> printfn "%A"   // compare lists of tuples
             compare [|10; 30|] [|10; 20|] |> printfn "%A"   // compare arrays
 
-        let generic_hashing () = ()
-        let generic_pretty_printing () = ()
-        let generic_boxing_and_unboxing () = ()
+        let generic_hashing () =
+            hash 100 |> printfn "hash 100 = %d"
+            hash "abc" |> printfn "hash \"abc\" = %d"
+            hash (100, "abc") |> printfn "hash (100, \"abc\") = %d"
+            hash ("abc", 100) |> printfn "hash (\"abc\", 100) = %d"
 
+        let generic_pretty_printing () =
+            sprintf "result = %A" ([1], [true])
+            
+
+        let generic_boxing_and_unboxing () =
+            let v1 = 1
+            printfn "%A" v1
+            let b1 = box 1
+            printfn "%A" b1
+
+            let v2 = "abc"
+            printfn "%A" v2
+            let b2 = box "abc"
+            printfn "%A" b2
+
+            let stringObj = box "abc"
+            printfn "%A" stringObj
+            let stringVal1 = unbox stringObj
+            printfn "%A" stringVal1
+            let stringVal2 = unbox<string> stringObj
+            printfn "%A" stringVal2
+
+            // THIS WILL THROW AN EXCEPTION : System.InvalidCastException
+            try 
+                let valex1 = (unbox stringObj : int)
+                valex1 |> printfn "%A"
+            with
+            | :? System.InvalidCastException as e -> printfn "Invalid Cast"
+
+            // THIS WILL THROW AN EXCEPTION : System.InvalidCastException
+            try 
+                let valex2 = unbox<int> stringObj
+                valex2 |> printfn "%A"
+            with
+            | :? System.InvalidCastException as e -> printfn "Invalid Cast"
+            
         let run () =
             generic_comparison()
             generic_hashing()
-            generic_pretty_printing()
-            generic_boxing_and_unboxing()            
+            generic_pretty_printing() |> ignore
+            generic_boxing_and_unboxing()
+
+    module generic_binary_serialization_via_dotnet_libraries =
+         let run () = ()
     
     module execute_modules =
 
@@ -280,7 +321,6 @@ open System
             understanding_generics.run()
             writing_generics_functions.run()
             some_important_generic_functions.run()
+            generic_binary_serialization_via_dotnet_libraries.run()
 
             printfn "[---- Expert F#: END CHAPTER 5 ----]"
-
-
