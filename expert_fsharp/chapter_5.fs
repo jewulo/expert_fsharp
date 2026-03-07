@@ -572,6 +572,7 @@ open System
             setTextOfControl form "Form Text"
             setTextOfControl textBox "Text Box Text"
         #else
+
         // Fallback stubs when System.Windows.Forms is unavailable.
         // These keep the module compiling without requiring the Forms assembly.
         let setTextOfControl (_: obj) (_: string) = ()
@@ -579,12 +580,13 @@ open System
         let run_forms () = ()
         #endif
 
+        // Note file input.txt does not exist so there is an exception
         let run_text_reader () =
             let textReader1 =
                 if DateTime.Today.DayOfWeek = DayOfWeek.Monday
                 then Console.In
                 else File.OpenText("input.txt")
-
+  
             let textReader2 =
                 if DateTime.Today.DayOfWeek = DayOfWeek.Monday
                 then Console.In
@@ -592,9 +594,125 @@ open System
 
             (textReader1, textReader2)
 
+        // Coercsing a StreamReader to as TextReader        
+        let getTextReader () : TextReader =
+            (File.OpenText("input.txt") :> TextReader)
+
         let run () =
             run_forms()
             run_text_reader()
+
+    module flexible_types =
+        //open System.Windows.Forms
+
+        //let setTextOfControl (c: 'T when 'T :> Control) (s : string) = c.Text <- s
+
+        let s1 = Seq.concat [[1; 2; 3]; [4; 5; 6]]
+        let s2 = Seq.concat [[|1; 2; 3|]; [|4; 5; 6|]]
+
+        let run () =
+            s1 |> printfn "%A"
+            s2 |> printfn "%A"
+
+    module using_type_annotations =
+
+        // this generates an error FS0072
+        //let getLengths inp =
+        //    inp |> Seq.map (fun y -> y.Length)
+
+        // this solves the error FS0072 by explicitly specfing the type of y
+        let getLengths inp =
+            inp |> Seq.map (fun (y : string) -> y.Length)
+
+        // warning FS0064: This construct causes code to be less generic than
+        // indicated by the type annotations.
+        // The type variable 'T has been constrained to be type 'int'.
+        let printSecondElements1 (inp : seq<'T * int>) =
+            inp
+            |> Seq.iter (fun (x, y) -> printf "y = %d" x)
+
+        //  error FS0001: The type 'PingPong' is not compatible with any of the types byte,int16,int32,int64,sbyte,uint16,uint32,uint64,nativeint,unativeint, arising from the use of a printf-style format string
+        //type PingPong = Ping | Pong
+        //let printSecondElements2 (inp : seq<PingPong * int>) =
+        //    inp
+        //    |> Seq.iter (fun (x, y) -> printf "y = %d" x)
+
+        let run () =
+            let s1 = Seq.concat [["one"; "two"; "three"]; ["four"; "five"; "six"]]
+            let s2 = Seq.concat [[|"one"; "two"; "three"|]; [|"four"; "five"; "six"|]]
+
+            getLengths s1 |> printfn "%A"
+            getLengths s2 |> printfn "%A"
+
+    module understanding_value_restrictions =
+
+        let run () =
+            // error FS0030: Value restriction: The value 'empties' has an inferred generic type
+            // val empties: '_a list array. However, values cannot have generic type variables
+            // like '_a in "let x: '_a".
+            // let empties = Array.create 100 []
+
+            let emptyList = []
+            let initialLists = ([], [2])
+            let listOfEmptyLists = [[]; []]
+            let makeArray () = Array.create 100 []
+            ()
+
+    module working_around_value_restriction =
+
+        // Technique 1 : Constrain Values to Be Nongeneric
+        let technique_1 () =
+            // error FS0030:
+            // let empties = Array.create 100 []
+
+            // best to use explicit type specifications
+            let empties: int list [] = Array.create 100 []
+            ()
+
+        // Technique 2 : Ensure Generic Functions Have Explicit Arguments
+        let technique_2 () =
+            let mapFirst1 = List.map fst
+            let mapFirst2 inp = List.map fst inp
+            let mapFirst3 inp = inp |> List.map (fun (x, y) -> x)
+
+            let printFstElements1 = List.map fst >> List.iter (printf "res = %d")
+            let printFstElements2 inp = inp |> List.map fst |> List.iter (printf "res = %d")
+            ()
+
+        // Technique 3 : Add Dummy Arguments to Generic Functions When Necessary
+        let technique_3 () =
+            // let empties = Array.create 100 []
+
+            // use a dummy argument
+            let empties () = Array.create 100 []
+            let intEmpties : int list [] = empties()
+            let stringEmpties : string list [] = empties()
+            ()
+
+        // Technique 4 : Add Explicit Type Arguments When Necessary
+        //let emptyLists = Seq.init 100 (fun _ -> [])
+        let emptyLists<'T> : seq<'T list> = Seq.init 100 (fun _ -> [])
+
+        let technique_4 () =
+            Seq.length emptyLists |> printfn"%d"
+            emptyLists |> printfn"%A"
+            ()
+
+        let run () =
+            technique_1()
+            technique_2()
+            technique_3()
+            technique_4()
+
+    module understanding_generic_overloaded_operators =
+
+        // this is a constrained function despite no expliocit type specifications
+        let twice x = (x + x)
+        let twiceFloat (x: float) = (x + x)
+        let threeTimes x = (x + x + x)
+        let sizTimesInt64 (x:Int64) = threeTimes x + threeTimes x
+
+        let run () = ()
 
     module execute_modules =
 
@@ -615,11 +733,12 @@ open System
             generic_algorithms_through_inlining.run()
             understanding_subtyping.run()
             performing_type_tests_via_pattern_matching.run()
-            knowing_when_upcasts_are_applied_automatically.run()
+            //knowing_when_upcasts_are_applied_automatically.run() |> ignore
+            flexible_types.run()
+            using_type_annotations.run()
 
-            // continue from page 105
+            understanding_value_restrictions.run()
+            working_around_value_restriction.run()
+            understanding_generic_overloaded_operators.run()
+
             printfn "[---- Expert F#: END CHAPTER 5 ----]"
-
-
-
-
