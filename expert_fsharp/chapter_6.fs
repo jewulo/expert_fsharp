@@ -179,6 +179,7 @@ module chapter_6
 
         type SparseVector(items : seq<int * float>) =
             let elems = new SortedDictionary<_,_>()
+            
             do items |> Seq.iter (fun (k, v) -> elems.Add(k, v))
 
             /// This defines an indexer property
@@ -219,12 +220,93 @@ module chapter_6
         let run () =
             let v1 = Vector2DWithOperators(3.0,4.0)
             let v2 = v1 + v1;
+            let v3 = v2 - v1;
             v1 |> printfn "%A"   // prints long type name - chapter_6+using_classes+Vector2D
             
-    // CONTINUE FROM CHAPTER 6: PAGE 120
-    // USING NAMED AND OPTIONAL ARUGUMENTS
+    module using_named_and_optional_arguments =
+        open System.Drawing
+        
+        type LabelInfo(?text : string, ?font : Font) =
+            let text = defaultArg text ""
+            let font = match font with
+                           | None -> new Font(FontFamily.GenericSansSerif, 12.0f)
+                           | Some v -> v
+            member x.Text = text
+            member x.Font = font
 
-    module using_named_and_optional_arguments = 
+            /// Define a static method which creates an instance
+            static member Create(?text, ?font) = new LabelInfo(?text = text, ?font = font)
+
+        let run () =
+            let l1 = LabelInfo(text = "Hello World") // explicit naming of parameter text
+            let l2 = LabelInfo("Goodbye Lenin") // no explicit naming of parameter text
+            let l3 = LabelInfo(font = new Font(FontFamily.GenericMonospace, 36.0f),
+                                        text = "Imagine")
+            ()
+
+    module adding_method_overloading =
+        /// Interval(lo,hi) represents the range of numbers from lo to hi,
+        /// but not including either lo or hi
+
+        type Interval(lo, hi) =
+            member r.Lo = lo
+            member r.Hi = hi
+            member r.IsEmpty = hi <= lo
+
+            static member Empty = Interval(0.0, 0.0)
+
+            /// Return the smallest interval that covers both the intervals
+            /// This method is overloaded.
+            static member Span (r1 : Interval, r2 : Interval) =
+                if r1.IsEmpty then r2 else
+                if r2.IsEmpty then r1 else
+                Interval(min r1.Lo r2.Lo, max r1.Hi r2.Hi)
+
+            /// Return the smallest interval that covers all the intervals
+            /// This method is overloaded.
+            static member Span (ranges : seq<Interval>) =
+                Seq.fold (fun r1 r2 -> Interval.Span(r1, r2)) Interval.Empty ranges
+
+        type Vector =
+            { DX : float; DY : float }
+            member v.Length = sqrt( v.DX * v.DX + v.DY * v.DY)
+
+        type Point =
+            { X : float; Y : float }
+
+            static member (-) (p1 : Point, p2 : Point) =
+                { DX = p1.X - p2.X; DY = p1.Y - p2.X }
+
+            static member (-) (p : Point, v : Vector) =
+                { X = p.X - v.DX; Y = p.Y - v.DY }
+
+        let run () =
+            let i1 = Interval(1.0, 4.0)
+            let i2 = Interval(0.0, 5.0)
+            let i3 = Interval.Span(i1, i2)
+            let i4 = Interval.Span(i3, i1)
+            let i5 = Interval.Span(seq {i1; i2; i3; i4})
+            //
+            printfn "[---- Caluclate Spans ----]"
+            i3 |> printfn "%A"
+            i5 |> printfn "%A"
+
+            let v = { DX = 5; DY = 6 }
+            let p1 = { X = 1.3; Y = 4.6 }
+            let p2 = { X = 2.3; Y = 6.1 }
+
+            let v2 = p2 - p1;
+            let p3 = p2 - v;
+            let p4 = p1 - v;
+            v2 |> printfn "%A"
+            p3 |> printfn "%A"
+            p4 |> printfn "%A"
+            
+
+    // CONTINUE FROM CHAPTER 6: PAGE 122
+    // DEFINING OBJECTS TYPES WITH MUTABLE STATE
+    module defining_objects_with_mutable_state =
+
         let run () = ()
 
     module execute_modules =
@@ -238,6 +320,9 @@ module chapter_6
             using_classes_2.run()
             using_classes_3.run()
             working_with_indexer_properties.run()
+            adding_method_overloading.run()
+            defining_objects_with_mutable_state.run()
 
             printfn "[---- Expert F#: END CHAPTER 6 ----]"
+
 
