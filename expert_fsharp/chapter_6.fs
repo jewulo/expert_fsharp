@@ -347,19 +347,144 @@ module chapter_6
         let run_integer_matrix () =
             printfn "[---- use custom index ----]"
             let mat2x2 = IntegerMatrix(2, 2)
-            mat2x2.[0, 0] <- 1
-            mat2x2.[0, 0] |> printfn "%d"
-            // see contents of none assigned array postion
+
+            // see contents of none initial array postion
+            mat2x2.[0, 0] |> printfn "%d"   // prints 0
             mat2x2.[0, 1] |> printfn "%d"   // prints 0
+            mat2x2.[1, 0] |> printfn "%d"   // prints 0
+            mat2x2.[1, 1] |> printfn "%d"   // prints 0
+
+            mat2x2 |> printfn "%A"
+
+            // see contents of none assigned array postion
+            mat2x2.[0, 0] <- 1
+            mat2x2.[0, 1] <- 2
+            mat2x2.[1, 0] <- 3
+            mat2x2.[1, 1] <- 4
+            mat2x2.[0, 0] |> printfn "%d"   // prints 1
+            mat2x2.[0, 1] |> printfn "%d"   // prints 2
+            mat2x2.[1, 0] |> printfn "%d"   // prints 3
+            mat2x2.[1, 1] |> printfn "%d"   // prints 4
+
+            mat2x2 |> printfn "%A"
 
         let run () =
             run_mutable_vector_2D()
             run_integer_matrix()
+   
+    module using_optional_property_settings =
+        
+        // visual studio cannot find System.Windows.Forms
+        //open System.Windows.Forms
 
+        //let form =
+        //    let tmp = new Form()
+        //    tmp.Visible <- true
+        //    tmp.TopMost <- true
+        //    tmp.Text <- "Welcome to F#"
+        //    tmp
 
-    // CONTINUE FROM CHAPTER 6: PAGE 124
-    // USING OPTIONAL PROPERTY SETTINGS
+        //type LabelInfoWithPropertySetting() =
+        //    let mutable text = ""   // the default
+        //    let mutable font = new Font(FontFamily.GenericSanSerif, 12.0f)
+        //    member x.Text with get() = text and set v = text <- v
+        //    member x.Font with get() = font and set v = font <- v
 
+        let run () = ()
+
+    module declaring_auto_properties =
+        
+        // visual studio cannot find System.Windows.Forms
+        //open System.Windows.Forms
+
+        //type LabelInfoWithPropertySetting() =
+        //    member val Name = "label"            
+        //    member val Text = "" with get, set
+        //    member val Font = new Font(FontFamily.GenericSanSerif, 12.0f) with get, set
+
+        let run () = ()
+
+    module getting_started_with_object_interface_types =
+
+        open System.Drawing
+
+        // Defining New Object Interface Type
+        // Interface Type IShape
+        type IShape =
+            abstract Contains : Point -> bool
+            abstract BoundingBox : Rectangle
+
+        // Implementing Object Interface Types Using Object Expressions
+        // Implementations of Interface Type IShape
+        let circle (centre : Point, radius : int) =
+            {   new IShape with
+                
+                    member x.Contains (p: Point): bool = 
+                        let dx = float32 (p.X - centre.X)
+                        let dy = float32 (p.Y - centre.Y)
+                        sqrt(dx * dx + dy * dy) <= float32 radius
+
+                    member x.BoundingBox: Rectangle = 
+                        Rectangle(centre.X - radius, centre.Y - radius,
+                        2 * radius + 1, 2 * radius + 1)
+            }
+
+        let square (centre : Point, side : int) =
+            {   new IShape with
+                
+                    member x.Contains (p: Point): bool = 
+                        let dx = p.X - centre.X
+                        let dy = p.Y - centre.Y
+                        abs(dx) < side / 2 && abs(dy) * dy < side / 2
+
+                    member x.BoundingBox: Rectangle = 
+                        Rectangle(centre.X - side, centre.Y - side, side * 2, side * 2)
+            }
+          
+        type MutableCircle() =
+        
+            member val Centre = Point(x = 0, y = 0) with get, set
+            member val Radius = 10 with get, set
+
+            member c.Perimeter = 2.0 * System.Math.PI * float c.Radius
+
+            interface IShape with
+                
+                member c.Contains (p: Point): bool = 
+                    let dx = float32 (p.X - c.Centre.X)
+                    let dy = float32 (p.Y - c.Centre.Y)
+                    sqrt(dx * dx + dy * dy) <= float32 c.Radius
+
+                member c.BoundingBox=
+                    Rectangle(c.Centre.X - c.Radius, c.Centre.Y - c.Radius,
+                    2 * c.Radius + 1, 2 * c.Radius + 1)
+                
+        let run () =
+            let c1 = circle (Point(0,0), 10)
+            c1.Contains(Point(0,0)) |> printfn "%b"
+            c1.Contains(Point(2,2)) |> printfn "%b"
+            c1.Contains(Point(20,0)) |> printfn "%b"
+            c1.Contains(Point(0,20)) |> printfn "%b"
+            
+
+            let s1 = square (Point(0,0), 10)
+            s1.Contains(Point(0,0)) |> printfn "%b"
+            s1.Contains(Point(2,2)) |> printfn "%b"
+            s1.Contains(Point(20,0)) |> printfn "%b"
+            s1.Contains(Point(0,20)) |> printfn "%b"
+
+            let c2 = MutableCircle()
+            c2.Radius |> printfn "%d"
+
+            // c2.BoundingBox |> printfn "%A" // error FS0039: The type 'MutableCircle' does not define the field, constructor or member 'BoundingBox'.
+            (c2 :> IShape).BoundingBox |> printfn "%A"
+
+        // Using Common Object Interface Types from the .NET Libraries
+        // CONTINUE FROM CHAPTER 6: PAGE 129
+
+    module using_common_object_interface_types_from_dotnet_libraries =
+
+        let run() = ()
 
     module execute_modules =
 
@@ -374,6 +499,7 @@ module chapter_6
             working_with_indexer_properties.run()
             adding_method_overloading.run()
             defining_objects_with_mutable_state.run()
+            getting_started_with_object_interface_types.run()
 
             printfn "[---- Expert F#: END CHAPTER 6 ----]"
 
