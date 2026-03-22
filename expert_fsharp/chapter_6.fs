@@ -479,13 +479,193 @@ module chapter_6
             // c2.BoundingBox |> printfn "%A" // error FS0039: The type 'MutableCircle' does not define the field, constructor or member 'BoundingBox'.
             (c2 :> IShape).BoundingBox |> printfn "%A"
 
-        // Using Common Object Interface Types from the .NET Libraries
-        // CONTINUE FROM CHAPTER 6: PAGE 129
-
     module using_common_object_interface_types_from_dotnet_libraries =
 
-        let run() = ()
+        type IEnumerator<'T> =
+            abstract Current : 'T
+            abstract MoveNext : unit -> bool
 
+        type IEnumerable<'T> =
+            abstract GetEnumerator : unit -> IEnumerator<'T>
+
+        let run () = ()
+
+
+    module understand_hierarchies_of_object_interface_types =
+
+        type IEnumerator<'T> =
+            abstract Current : 'T
+            abstract MoveNext : unit -> bool
+
+        type IEnumerable<'T> =
+            abstract GetEnumerator : unit -> IEnumerator<'T>
+
+        type ICollection<'T> =
+            inherit IEnumerable<'T>
+            abstract Count : int
+            abstract IsReadOnly : bool
+            abstract Add : 'T -> unit
+            abstract Clear : unit -> unit
+            abstract Contains : 'T -> bool
+            abstract CopyTo : 'T [] * int -> unit
+            abstract Remove : 'T -> unit
+
+        let run () = ()
+
+    module combining_object_expressions_and_function_parameters =
+
+        /// An object interface type that consumes characters and strings
+        type ITextOutputSink =
+            /// When implemented, writes one unicode character to the sink
+            abstract WriteChar : char -> unit
+
+            /// When implemented, writes one unicode string to the sink
+            abstract WriteString : string -> unit
+
+        /// Returns an object that implements ITextOutputSink by using writeCharFunction
+        let simpleOutputSink writeCharFunction =
+            { new ITextOutputSink with
+                member x.WriteChar (c) = writeCharFunction c
+                member x.WriteString (s) = s |> String.iter x.WriteChar }
+
+        let stringBuilderOutputSink (buf : System.Text.StringBuilder) = 
+            simpleOutputSink (fun c -> buf.Append(c) |> ignore)
+
+        let run_1 () =
+            let buf = new System.Text.StringBuilder()
+            let c = stringBuilderOutputSink(buf)
+            ["Incy"; " "; "Wincy"; " "; "Spider"] |> List.iter c.WriteString
+            buf.ToString() |> printfn "%s"
+
+        /// A type which fully implements the ItextOutputSink object interface
+        type CountingOutputSink(writeCharFunction : char -> unit) =
+            
+            let mutable count = 0
+
+            interface ITextOutputSink with
+                member x.WriteChar (c) = count <- count + 1; writeCharFunction c
+                member x.WriteString (s) = s |> String.iter (x :> ITextOutputSink).WriteChar 
+
+            member x.Count = count
+
+        let run_2 () =
+            let coutsink = CountingOutputSink(fun c -> printf"%c" c)
+            ["Incy"; " "; "Wincy"; " "; "Spider"] |> List.iter (fun s -> (coutsink :> ITextOutputSink).WriteString s)
+
+        let run () =
+            run_1 ()
+            run_2 ()
+            printfn ""
+
+    module defining_partially_implemented_class_types =
+        
+        /// A type whose members are partially implemented
+        [<AbstractClass>]
+        type TextOutputSink() =
+            abstract WriteChar : char -> unit
+            abstract WriteString : string -> unit
+            default x.WriteString s = s |> String.iter x.WriteChar
+        
+        let run () =
+            // to create an object of type TextOutputSink you need to provide
+            // an implemntation of WriteChar : char -> unit
+            // you can do this with an object expressionf
+            let s = { new TextOutputSink() with
+                                    member x.WriteChar (c: char): unit = System.Console.Write(c) }
+
+            ["Incy"; " "; "Wincy"; " "; "Spider"] |> List.iter s.WriteString
+            printfn ""
+
+    module using_partially_implemented_types_via_delegation =
+
+        /// A type whose members are partially implemented
+        [<AbstractClass>]
+        type TextOutputSink() =
+            abstract WriteChar : char -> unit
+            abstract WriteString : string -> unit
+            default x.WriteString s = s |> String.iter x.WriteChar
+        
+        /// A type which uses a TextOutputSink internally
+        type HtmlWriter() =
+            let mutable count = 0
+            let sink = { new TextOutputSink() with
+                                        member x.WriteChar c =
+                                            count <- count + 1
+                                            System.Console.Write c }
+
+            member x.CharCount = count
+            member x.OpenTag(tagName) = sink.WriteString(sprintf "<%s>" tagName)
+            member x.CloseTag(tagName) = sink.WriteString(sprintf "</%s>" tagName)
+            member x.WriteString(s) = sink.WriteString(s)
+
+        let run () =
+            let hw = HtmlWriter()
+            hw.OpenTag("html")
+            hw.CloseTag("html")
+            printfn ""
+
+     // Using Partially Implemented Types via Implementation Inheritance
+     // CONTINUE FROM CHAPTER 6: PAGE 134
+
+    module using_partially_implemented_types_via_implementation_inheritance =
+
+        /// A type whose members are partially implemented
+        [<AbstractClass>]
+        type TextOutputSink() =
+            abstract WriteChar : char -> unit
+            abstract WriteString : string -> unit
+            default x.WriteString s = s |> String.iter x.WriteChar
+
+        /// A type which inherits from TextOutputSink
+        /// An implementation of TextOutputSink, counting the number of bytes written
+        type CountingOutputSinkByInheritance() =
+            inherit TextOutputSink()
+
+            let mutable count = 0
+
+            member sink.Count = count
+
+            default sink.WriteChar c =
+                count <- count + 1
+                System.Console.Write c
+        
+        open System.Text
+        [<AbstractClass>]
+        type ByteOutputSink() =
+            inherit TextOutputSink()
+
+            // When implemented, writes one byte to the sink
+            abstract WriteByte : byte -> unit
+
+            // When implemented, writes multiple bytes to the sink
+            abstract WriteBytes : byte[] -> unit
+            
+            default sink.WriteChar c = sink.WriteBytes(Encoding.UTF8.GetBytes [|c|])
+
+            override sink.WriteString s = sink.WriteBytes(Encoding.UTF8.GetBytes s)
+
+            default sink.WriteBytes b = b |> Array.iter sink.WriteByte
+
+        let run () =
+            let cosbi = CountingOutputSinkByInheritance()
+            cosbi.Count |> printfn "%d"
+            cosbi.WriteChar 'A'
+            cosbi.WriteChar 'B'
+            cosbi.WriteChar 'C'
+            printfn ""
+            cosbi.Count |> printfn "%d"
+
+            // let bos = ByteOutputSink() // error not fully implemented
+
+            printfn ""
+        
+     // Combining Functional and Objects: Cleaning Up Resources 
+     // CONTINUE FROM CHAPTER 6: PAGE 135
+
+    module combining_functional_and_objects_cleaning_up_resources  =
+
+        let run () = ()
+            
     module execute_modules =
 
         let run () =
@@ -500,6 +680,14 @@ module chapter_6
             adding_method_overloading.run()
             defining_objects_with_mutable_state.run()
             getting_started_with_object_interface_types.run()
+            using_common_object_interface_types_from_dotnet_libraries.run()
+            understand_hierarchies_of_object_interface_types.run()
+            combining_object_expressions_and_function_parameters.run()
+            defining_partially_implemented_class_types.run()
+            using_partially_implemented_types_via_delegation.run()
+            using_partially_implemented_types_via_implementation_inheritance.run()
+            combining_functional_and_objects_cleaning_up_resources.run()
+
 
             printfn "[---- Expert F#: END CHAPTER 6 ----]"
 
