@@ -659,13 +659,270 @@ module chapter_6
 
             printfn ""
         
-     // Combining Functional and Objects: Cleaning Up Resources 
-     // CONTINUE FROM CHAPTER 6: PAGE 135
+    module combining_functional_and_objects_cleaning_up_resources =
 
-    module combining_functional_and_objects_cleaning_up_resources  =
+        open System.IO
+
+        // the 'use' keyword provides automatic destruction rather than explicit destruction
+        let myWriteStringToFile_1 () =
+            use outp = File.CreateText("playlist_1.txt")
+            outp.WriteLine("Enchanted")
+            outp.WriteLine("Put your records on")
+
+        // the above is equivalent to using 'let' rather than 'use'
+        let myWriteStringToFile_2 () =
+            let outp = File.CreateText("playlist_2.txt")
+            try
+                outp.WriteLine("Enchanted")
+                outp.WriteLine("Put your records on")
+            finally
+                (outp :> System.IDisposable).Dispose()
+
+        let run () =
+            myWriteStringToFile_1()
+            myWriteStringToFile_2()
+    
+    module resources_and_idisposable = 
+
+        // definition of IDisposable
+        type IDisposable =
+            abstract Dispose : unit -> unit
+
+        let http (url : string) =
+            let req = System.Net.WebRequest.Create url
+            use resp = req.GetResponse()
+            // use stream = req.GetResponseStream()
+            use stream = req.GetRequestStream()
+            use reader = new System.IO.StreamReader(stream)
+            let html = reader.ReadToEnd()
+            html
 
         let run () = ()
+            // CRASHES
+            // http("https://www.youtube.com/") |> printfn "%s"
+
+    module cleaning_up_internal_objects =
+        open System
+        open System.IO
+
+        type LineChooser (fileName1, fileName2) =
+            let file1 = File.OpenText(fileName1)
+            let file2 = File.OpenText(fileName2)
+            let rnd = new System.Random()
+
+            let mutable disposed = false
+
+            let cleanup () =
+                if not disposed then
+                    disposed <- true
+                    file1.Dispose()
+                    file2.Dispose()
+
+            interface System.IDisposable with
+                member x.Dispose (): unit = cleanup()
+
+            member obj.CloseAll () = cleanup()
+
+            member obj.GetLine () = 
+                if not file1.EndOfStream && (file2.EndOfStream || rnd.Next() % 2 = 0) then file1.ReadLine()
+                elif not file2.EndOfStream then file2.ReadLine()
+                else raise (new EndOfStreamException())
+
+        let run () =
+            File.WriteAllLines("test1.txt", [|"Daisy, Daisy"; "Give me your hand oh do"|])
+            File.WriteAllLines("test2.txt", [|"I'm a little teapot"; "Short and stout"|])
+            let chooser = new LineChooser("test1.txt", "test2.txt")
+            chooser.GetLine() |> printfn "%s"
+            chooser.GetLine() |> printfn "%s"
+            (chooser :> IDisposable).Dispose()
+            chooser.GetLine() |> printfn "%s"   // this will generate an exception
+            chooser.GetLine() |> printfn "%s"
+
+     // Cleaning Up Unmanaged Objects
+     // CONTINUE FROM CHAPTER 6: PAGE 140
+
+    module cleaning_up_unmanaged_objects =
+        open System
+
+        type TicketGenerator () =
+            let mutable free = []
+            let mutable max = 0
+
+            member h.Alloc() = 
+                match free with
+                | [] -> max <- max + 1; max
+                | h :: t -> free <- t; h
+
+            member h.Dealloc(n : int) =
+                printfn "returning ticket %d" n
+                free <- n :: free
+
+        let ticketGenerator = new TicketGenerator()
+
+        type Customer () =
+            let myTicket = ticketGenerator.Alloc()
+            let mutable disposed = false
+
+            let cleanup () =
+                if not disposed then
+                    disposed <- true
+                    ticketGenerator.Dealloc(myTicket)
+
+            member x.Ticket = myTicket
+
+            interface IDisposable with
+                member x.Dispose() = cleanup(); GC.SuppressFinalize(x)
+
+            override x.Finalize() = cleanup()
+
+        let run () =
+            let bill = new Customer()
+            begin
+                use joe = new Customer()
+                printfn "joe.Ticket = %d" joe.Ticket
+            end
+
+            begin
+                use jane = new Customer()
+                printfn "jane.Ticket = %d" jane.Ticket
+            end
+
+    module extend_exsisting_types_and_modules_1 =
+        module NumberTheoryExtensions = 
+
+            let isPrime i =
+                let lim = int (sqrt (float i))
+
+                let rec check j =
+                    j > lim || (i % j <> 0 && check(j + 1))
+                check 2
+
+            // add the isPrime function to the dotNet System.Int32 namespace
+            type System.Int32 with
+                member i.IsPrime = isPrime i
+
+        open NumberTheoryExtensions
+        let run () =
             
+            (2 + 1).IsPrime |> printfn "%b"
+            (6093700 + 11).IsPrime |> printfn "%b"
+    
+    module extend_exsisting_types_and_modules_2 =
+        module List =
+            let rec pairwise l =
+                match l with
+                | [] | [_] -> []
+                | h1 :: ((h2 :: _) as t) -> (h1, h2) :: pairwise t
+
+        let run () =
+            List.pairwise [1; 2; 3; 4] |> printfn "%A"
+            List.pairwise [1; 2; 3; 4; 5] |> printfn "%A"
+
+    module working_with_fsharp_objects_and_dotnet_types_1 =
+        
+        // defining a class using class/end 
+        type Vector2D_a(dx : float, dy : float) =
+            class
+                let len = sqrt(dx * dx + dy * dy)
+                member v.DX = dx
+                member v.DY = dy
+                member v.Length = len
+            end
+
+        // defining a class using a Class attribute
+        [<Class>]
+        type Vector2D_b(dx : float, dy : float) =
+            let len = sqrt(dx * dx + dy * dy)
+            member v.DX = dx
+            member v.DY = dy
+            member v.Length = len
+
+        let run () = ()
+
+    module working_with_fsharp_objects_and_dotnet_types_2 =
+
+        open System.Drawing // for type Rectangle
+
+        // defining an interface using interface/end        
+        type IShape_a =
+            interface
+                abstract Contains : Point -> bool
+                abstract BoundingBox : Rectangle
+            end
+
+        // defining an interface using an interface attribute
+        [<Interface>]
+        type IShape_b =
+            abstract Contains : Point -> bool
+            abstract BoundingBox : Rectangle
+
+        // defining a struct with explicit parameters
+        [<Struct>]
+        type Vector2DStruct(dx : float, dy : float) =
+            member v.DX = dx
+            member v.DY = dy
+            member v.Length = sqrt(dx * dx + dy * dy)
+
+        // defining a struct with explicit values
+        [<Struct>]
+        type Vector2DStructUsingExplicitVals =
+            val dx : float
+            val dy : float
+            member v.DX = v.dx
+            member v.DY = v.dy
+            member v.Length = sqrt(v.dx * v.dx + v.dy * v.dy)
+        
+        let run () = ()
+
+    module working_with_fsharp_objects_and_dotnet_types_3 =
+
+        // defining a delegate type
+        type ControlEventHandler = delegate of int -> bool
+        open System.Runtime.InteropServices
+        let ctrlSignal = ref false
+        [<DllImport("kernel32.dll")>]
+        extern void SetConsoleCtrlHandler(ControlEventHandler callback, bool add)
+
+        let ctrlEventHandler = new ControlEventHandler(fun i -> ctrlSignal := true; true)
+
+        SetConsoleCtrlHandler(ctrlEventHandler, true)
+
+        let run () = ()
+
+    module working_with_fsharp_objects_and_dotnet_types_4 =
+
+        // Enums
+        type Vowels =
+            | A = 1
+            | E = 5
+            | I = 9
+            | O = 15
+            | U = 21
+
+        let run () = ()
+
+    module working_with_fsharp_objects_and_dotnet_types_5 =
+
+        // Working with null Values
+        let working_with_null_values_1 () =
+            let parents = [("Adam", None); ("Cain", Some("Adam", "Eve"))]
+            parents
+
+        let working_with_null_values_2 () =
+            match System.Environment.GetEnvironmentVariable("PATH") with
+            | null -> printf "the environment variable PATH is not defined\n"
+            | res -> printf "the environment variable PATH is set to %s\n" res
+
+        let switchOnType(a : obj) =
+            match a with
+            | null                                   -> printf "null"
+            | :? System.Exception as e -> printf "An exception: %s!" e.Message
+            | :? System.Int32 as i        -> printf "An integer: %d!" i
+            | :? System.DateTime as d   -> printf "A date/time: %O!" d
+            | _                                      -> printf "Some other kind of object\n"
+
+        let run () = ()
+
     module execute_modules =
 
         let run () =
@@ -687,7 +944,15 @@ module chapter_6
             using_partially_implemented_types_via_delegation.run()
             using_partially_implemented_types_via_implementation_inheritance.run()
             combining_functional_and_objects_cleaning_up_resources.run()
-
+            resources_and_idisposable.run()
+            cleaning_up_internal_objects.run()
+            extend_exsisting_types_and_modules_1.run()
+            extend_exsisting_types_and_modules_2.run()
+            working_with_fsharp_objects_and_dotnet_types_1.run()
+            working_with_fsharp_objects_and_dotnet_types_2.run()
+            working_with_fsharp_objects_and_dotnet_types_3.run()
+            working_with_fsharp_objects_and_dotnet_types_4.run()
+            working_with_fsharp_objects_and_dotnet_types_5.run()
 
             printfn "[---- Expert F#: END CHAPTER 6 ----]"
 
