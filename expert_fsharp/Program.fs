@@ -26,6 +26,7 @@ let main argv =
     //chapter_6.execute_modules.run()
     //chapter_7.execute_modules.run()
     chapter_8.execute_modules.run()
+    chapter_9.execute_modules.run()
 
     System.Console.ReadKey(true) |> ignore  
     pause()  
