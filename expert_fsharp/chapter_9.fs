@@ -298,13 +298,177 @@ module chapter_9
            let a8 = List.foldBack (fst >> min) [(3, "three"); (5, "five")] System.Int32.MaxValue
            a8 |> printfn "%d"
 
+    module cleaning_up_in_sequence_expressions =
 
+        open System.IO
+        
+        let firstTwoLines file =
+            seq {
+                use s = File.OpenText(file)
+                yield s.ReadLine()
+                yield s.ReadLine()
+            }
 
+        let run () =
+            File.WriteAllLines("test1.txt", [|"Ex kommt ein Schiff"; "A ship is coming"|])
+            let twolines () = firstTwoLines "test1.txt"
+            twolines() |> Seq.iter (printfn "line = '%s'")
+
+    module expressing_some_operations_using_sequence_expressions =
+
+        let rand = System.Random()
+
+        let gameBoard =
+            [ for i in 0 .. 7 do
+                for j in 0 .. 7 do
+                    yield (i, j, rand.Next(10)) ]
+
+        let triangleNumbers =
+            [ for i in 1 .. 10 do
+                for j in 1 .. i do
+                    yield (i, j) ]
+
+        let evenPositions =
+            [ for (i, j, v) in gameBoard do
+                if v % 2 = 0 then
+                    yield (i, j) ]
+
+        let run () =
+            gameBoard |> printfn "%A"
+            triangleNumbers |> printfn "%A"
+            evenPositions |> printfn "%A"
+
+    module structure_beyond_sequences_working_with_trees =
+
+        open System.Xml
+        open System.Drawing
+        // open System.Globalization   // for FSI printing. DOES NOT WORK
+
+        let inp = """<?xml version="1.0" encoding="utf-8" ?> 
+                             <Scene>
+                                <Composite>
+                                    <Circle radius='2' x='1' y='0'/>
+                                    <Composite>
+                                        <Circle radius='2' x='4' y='0'/>
+                                        <Square side='2' left='-3' y='0'/>
+                                    </Composite>
+                                    <Ellipse top='2' left='-2' width='3' height='4'/>
+                                </Composite>
+                             </Scene>"""
+
+        type Scene =
+            | Ellipse of RectangleF
+            | Rect of RectangleF
+            | Composite of Scene list
+
+            /// A derived constructor
+            static member Circle(center : PointF, radius) =
+                Ellipse(RectangleF(center.X - radius, center.Y - radius,
+                                        radius * 2.0f, radius * 2.0f))
+
+            /// A derived constructor
+            static member Square(left, top, side) =
+                Rect(RectangleF(left, top, side, side))
+        
+        /// Extract a number from an XML attribute collection
+        let extractFloat32 attrName (attribs : XmlAttributeCollection) =
+            float32(attribs.GetNamedItem(attrName).Value)
+
+        /// Extract a Point from an XML attribute collection
+        let extractPointF (attribs : XmlAttributeCollection) =
+            PointF(extractFloat32 "x" attribs, extractFloat32 "y" attribs)
+
+        /// Extract a Rectangle from an XML attribute collection
+        let extractRectangleF (attribs : XmlAttributeCollection) =
+            RectangleF(extractFloat32 "left" attribs, extractFloat32 "top" attribs,
+                    extractFloat32 "width" attribs, extractFloat32 "height" attribs)
+
+        /// Extract a Scene from an XML node
+        let rec extractScene(node : XmlNode) =
+            let attribs = node.Attributes
+            let childNodes = node.ChildNodes
+            match node.Name with
+            | "Circle" ->
+                Scene.Circle(extractPointF(attribs),extractFloat32 "top" attribs)
+            | "Ellipse" ->
+                Scene.Ellipse(extractRectangleF(attribs))
+            | "Rectangle" ->
+                Scene.Rect(extractRectangleF(attribs))
+            | "Square" ->
+                Scene.Square(extractFloat32 "left" attribs, extractFloat32 "top" attribs, extractFloat32 "side" attribs)
+            | "Composite" ->
+                Scene.Composite [for child in childNodes -> extractScene(child)]
+            | _ -> failwithf "unable to convert XML '%s'" node.OuterXml
+
+        /// Extract a list Scene from an XML node
+        let extractScenes (doc : XmlDocument) =
+            [for node in doc.ChildNodes do
+                if node.Name = "Scene" then
+                    yield (Composite
+                                [for child in node.ChildNodes -> extractScene(child)])]
+
+        /// Recursively Flatten an XML scene
+        let rec flatten scene =
+            seq {
+                match scene with
+                | Composite scenes -> for x in scenes do yield! flatten x
+                | Ellipse _ | Rect _ -> yield scene
+            }
+
+        /// Accumulatively Flatten an XML scene
+        /// traverses the tree eagerly accumulating in a parameter.
+        let rec flattenAux scene acc =
+            match scene with
+            | Composite scenes -> List.foldBack flattenAux scenes acc
+            | Ellipse _
+            | Rect _ -> scene :: acc
+
+        /// Invoke the accumulative recursion
+        let flatten2 scene = flattenAux scene [] |> Seq.ofList
+
+        /// Use eager traversal using a local mutable variable
+        let flatten3 scene =
+            let acc = new ResizeArray<_>()
+            let rec flattenAux s =
+                match s with
+                | Composite(scenes) -> scenes |> List.iter flattenAux
+                | Ellipse _ | Rect _ -> acc.Add s
+            flattenAux scene
+            Seq.readonly acc
+
+        // IT CRASHES AND I DO NOT KNOW WHY
+        let run () =
+            let doc = new XmlDocument()
+            doc.LoadXml(inp)
+            let scenes = extractScenes doc
+            scenes |> List.map flatten |> printfn "%A"
+            scenes |> List.map flatten2 |> printfn "%A"
+            scenes |> List.map flatten3 |> printfn "%A"
+    
+    // COULD NOT SOLVE THE BUG IN MODULE
+    // structure_beyond_sequences_working_with_trees
+    // SO NO POINT IN TRYING THIS YET
+    module transforming_abstract_syntax_representations =
+        let run () = ()
+
+    // COULD NOT SOLVE THE BUG IN MODULE
+    // structure_beyond_sequences_working_with_trees
+    // SO NO POINT IN TRYING THIS YET
+    module using_on_demand_computation_with_abstract_syntax_trees =
+        let run () = ()
+
+    // COULD NOT SOLVE THE BUG IN MODULE
+    // structure_beyond_sequences_working_with_trees
+    // SO NO POINT IN TRYING THIS YET
+    module caching_properties_in_abstract_syntax_trees =
+        let run () = ()
 
     /// CONTINUE FROM CHAPTER 9
-    /// PAGE 202
-    /// SECTION: CLEANING UP IN SEQUENCE EXPRESSIONS
+    /// PAGE 208
+    /// SECTION: MEMOIZING CONSTRUCTION OF SYNTAX TREE NODES
 
+    module memoizing_construction_of_syntax_tree_nodes =
+        let run () = ()
     module execute_modules =
 
         let run () =
@@ -320,3 +484,5 @@ module chapter_9
             selecting_multiple_elements_from_sequences.run()
             finding_elements_and_indexes_in_sequences.run()
             grouping_and_indexeing_sequences.run()
+            // BUGGY - IT CRASHES // structure_beyond_sequences_working_with_trees.run() 
+
