@@ -1,5 +1,5 @@
 module chapter_9
-
+    
     module using_range_expressions =
 
         let run () =
@@ -48,7 +48,8 @@ module chapter_9
                 (dir |> Directory.GetDirectories |> Seq.map allFiles |> Seq.concat)
 
         let run () =
-            allFiles @"c:\WINDOWS\system32" |> printfn "%A"
+            // allFiles @"c:\WINDOWS\system32" |> printfn "%A"
+            allFiles "." |> printfn "%A"
 
     module using_sequence_expressions =
 
@@ -441,6 +442,7 @@ module chapter_9
             let doc = new XmlDocument()
             doc.LoadXml(inp)
             let scenes = extractScenes doc
+
             scenes |> List.map flatten |> printfn "%A"
             scenes |> List.map flatten2 |> printfn "%A"
             scenes |> List.map flatten3 |> printfn "%A"
@@ -463,12 +465,344 @@ module chapter_9
     module caching_properties_in_abstract_syntax_trees =
         let run () = ()
 
-    /// CONTINUE FROM CHAPTER 9
-    /// PAGE 208
-    /// SECTION: MEMOIZING CONSTRUCTION OF SYNTAX TREE NODES
-
     module memoizing_construction_of_syntax_tree_nodes =
+
+        /// Non-Cached version of expression
+        module non_cached_version_of_expression = 
+
+            type Prop = 
+                | And of Prop * Prop
+                | Or of Prop * Prop
+                | Not of Prop
+                | Var of string
+                | True
+
+            let run () = ()
+
+        module cached_version_of_expression =
+        
+            type Prop = 
+                | Prop of int
+
+            type PropRepr = 
+                | AndRepr of Prop * Prop
+                | OrRepr of Prop * Prop
+                | NotRepr of Prop
+                | VarRepr of string
+                | TrueRepr
+            
+            open System.Collections.Generic
+
+            module PropOps =
+                
+                let internal uniqStamp = ref 0
+
+                type internal PropTable () =
+                    let fwdTable = new Dictionary<PropRepr, Prop>(HashIdentity.Structural)
+                    let bwdTable = new Dictionary<int, PropRepr>(HashIdentity.Structural)
+
+                    member t.ToUnique repr =
+                        if fwdTable.ContainsKey repr then                        
+                            fwdTable.[repr]
+                        else
+                            // let stamp = incr uniqStamp; !uniqStamp -- // USE OF ! is DEPRECATED
+                            // let stamp = incr uniqStamp; uniqStamp.Value // USE OF incr is DEPRECATED
+                            let stamp = uniqStamp.Value <- uniqStamp.Value + 1; uniqStamp.Value
+                            let prop = Prop stamp
+                            fwdTable.Add (repr, prop)
+                            bwdTable.Add (stamp, repr)
+                            prop
+
+                    member t.FromUnique (Prop stamp) =
+                        bwdTable.[stamp]
+                        
+                let internal table = PropTable ()
+
+                // public construction functions
+                let And (p1, p2) = table.ToUnique (AndRepr (p1, p2))
+                let Not p = table.ToUnique (NotRepr p)
+                let Or (p1, p2) = table.ToUnique (OrRepr (p1, p2))
+                let Var p = table.ToUnique (VarRepr p)
+                let True = table.ToUnique TrueRepr
+                let False = Not True
+
+                // deconstruction function
+                let getRepr p = table.FromUnique p                    
+        
+            open PropOps
+            let run () = 
+                let p = True
+                p |> printfn "%A"
+
+                let p1 = And (Var "x", Var "y")
+                p1 |> printfn "%A"
+
+                let p2 = getRepr p1
+                p2 |> printfn "%A"
+
+                let p3 = And (Var "x", Var "y")
+                p3 |> printfn "%A"
+
+                ()
+
+        /// run code for module:
+        /// MEMOIZING CONSTRUCTION OF SYNTAX TREE NODES
+        let run () =
+            non_cached_version_of_expression.run()
+            cached_version_of_expression.run()
+
+    module converting_the_same_data_to_many_views =
+        
+        [<Struct>]
+        type Complex (r : float, i : float) =
+            static member Polar (mag, phase) = Complex (mag * cos phase, mag * sin phase)
+            member x.Magnitude = sqrt(r * r + i * i)
+            member x.Phase = atan2 i r
+            member x.RealPart = r
+            member x.ImaginaryPart = i
+
+        // Defining Active Patterns:
+
+        // Here is an active pattern that lets you view complex numbers as rectangular coordinates
+        let (|Rect|) (x : Complex) = (x.RealPart, x.ImaginaryPart)
+
+        // Here is a active pattern that lets you view complex numbers in polar coordinates
+        let (|Polar|) (x : Complex) = (x.Magnitude, x.Phase)
+
+        // we can noe patter match on both Rect and Polar
+
+        let addViaRect a b =
+            match a, b with
+            | Rect (ar, ai), Rect (br, bi) ->
+                Complex (ar + br, ai + bi)
+
+        let mulViaRect a b =
+            match a, b with
+            | Rect (ar, ai), Rect (br, bi) ->
+                Complex (ar * br - ai * bi, ai * br + bi * ar)
+
+        // multiplication on complex numbers is easier to express using polar coordinates
+        let mulViaPolar a b =
+            match a, b with
+            | Polar (m, p), Polar (n, q) -> 
+                Complex.Polar (m * n, p + q)
+
+        // used on the console
+        // fsi.AddPrinter (fun (c : Complex) -> sprintf "%gr + %gi" c.RealPart c.ImaginaryPart)
+        
+        // NOTE:
+        // addViaRect and mulViaPolar can also be written using explicit patterns
+        // by using pattern matching in argument positions
+        let add2 (Rect (ar, ai)) (Rect (br, bi)) 
+            = Complex (ar + br, ai + bi)
+        let mul2 (Polar (r1, th1)) (Polar (r2, th2)) 
+            = Complex (r1 * r2, th1 + th2)
+        
+        let run () =
+            let c = Complex (3.0, 4.0)
+            match c with | Rect (x, y) -> printfn "x = %g, y = %g" x y
+            match c with | Polar (x, y) -> printfn "x = %g, y = %g" x y
+
+            let c1 = addViaRect c c
+            match c1 with | Rect (x, y) -> printfn "x = %g, y = %g" x y
+            match c1 with | Polar (x, y) -> printfn "x = %g, y = %g" x y
+
+            let c2 = mulViaRect c c
+            match c2 with | Rect (x, y) -> printfn "x = %g, y = %g" x y
+            match c2 with | Polar (x, y) -> printfn "x = %g, y = %g" x y
+
+            let c3 = mulViaPolar c c
+            match c3 with | Rect (x, y) -> printfn "x = %g, y = %g" x y
+            match c3 with | Polar (x, y) -> printfn "x = %g, y = %g" x y
+
+            let c4 = add2 c c
+            match c4 with | Rect (x, y) -> printfn "x = %g, y = %g" x y
+            match c4 with | Polar (x, y) -> printfn "x = %g, y = %g" x y
+
+            let c5 = mul2 c c
+            match c5 with | Rect (x, y) -> printfn "x = %g, y = %g" x y
+            match c5 with | Polar (x, y) -> printfn "x = %g, y = %g" x y
+
+    /// CONTINUE FROM CHAPTER 9
+    /// PAGE 216
+    /// SECTION: EQUALITY, HASHING AND COMPARISISON FOR NEW STRUCTURED DATA TYPES
+    module matching_on_dotnet_object_types =
+        open System
+
+        // declare active types that can be used fro pattern matching
+        // |Named|Array|Ptr|Param| is the active type declaration
+        let (|Named|Array|Ptr|Param|) (typ : System.Type) =
+            if typ.IsGenericType        then Named (typ.GetGenericTypeDefinition(), typ.GetGenericArguments())
+            elif typ.IsGenericParameter then Param (typ.GenericParameterPosition)
+            elif not typ.HasElementType then Named (typ, [||])
+            elif typ.IsArray            then Array (typ.GetElementType(), typ.GetArrayRank())
+            elif typ.IsByRef            then Ptr (true, typ.GetElementType())
+            elif typ.IsPointer          then Ptr (false, typ.GetElementType())
+            else                        failwith "MSDN says this can't happen"
+
+        // defining the active patterns above, then allows you to
+        // pattern match on Named, Array, Ptr and Param
+        let rec formatType typ =
+            match typ with
+            | Named (con, [||]) ->
+                sprintf "%s" con.Name
+            | Named (con, args) ->
+                sprintf "%s<%s>" con.Name (formatTypes args)
+            | Array (arg, rank) ->
+                sprintf "Array(%d,%s)" rank (formatType arg)
+            | Ptr (true, arg) ->
+                sprintf "%s&" (formatType arg)
+            | Ptr (false, arg) ->
+                sprintf "%s*" (formatType arg)
+            | Param (pos) ->
+                sprintf "!%d" pos
+
+        and formatTypes typs =
+            String.Join (",", Array.map formatType typs)
+
+        // Collect free generic parameter positions appearing in a System.Type
+        let rec freeVarsAcc typ acc =
+            match typ with
+            | Array (arg, rank) ->
+                freeVarsAcc arg acc
+            | Ptr (_, arg) ->
+                freeVarsAcc arg acc
+            | Param _ ->
+                (typ :: acc)
+            | Named (con, args) ->
+                // fold over generic argument types
+                Array.foldBack freeVarsAcc args acc
+
+        let freeVars typ = freeVarsAcc typ []
+
         let run () = ()
+
+    module defining_partial_and_parameterize_active_patterns =
+
+        let (|MulThree|_|) inp = if inp % 3 = 0 then Some(inp / 3) else None
+        let (|MulSeven|_|) inp = if inp % 7 = 0 then Some(inp / 7) else None
+
+        // active paterns can take multiple arguments
+        let (|MulN|_|) n inp = if inp % 7 = 0 then Some(inp / n) else None
+
+        let isMultiple_of_3_or_7 n =
+            match n with
+            | MulThree n
+            | MulSeven n -> true
+            | _ -> false
+
+        let run () =
+            isMultiple_of_3_or_7 12 |> printfn "%b"
+            isMultiple_of_3_or_7 49 |> printfn "%b"
+            isMultiple_of_3_or_7 13 |> printfn "%b"
+
+    module hiding_abstract_syntax_implementations_with_active_patterns =
+
+        type Prop = Prop of int
+        and PropRepr = 
+            | AndRepr of Prop * Prop
+            | OrRepr of Prop * Prop
+            | NotRepr of Prop
+            | VarRepr of string
+            | TrueRepr
+            
+        open System.Collections.Generic
+
+        module PropOps =
+                
+            let internal uniqStamp = ref 0
+
+            type internal PropTable () =
+                let fwdTable = new Dictionary<PropRepr, Prop>(HashIdentity.Structural)
+                let bwdTable = new Dictionary<int, PropRepr>(HashIdentity.Structural)
+
+                member t.ToUnique repr =
+                    if fwdTable.ContainsKey repr then                        
+                        fwdTable.[repr]
+                    else
+                        // let stamp = incr uniqStamp; !uniqStamp -- // USE OF ! is DEPRECATED
+                        // let stamp = incr uniqStamp; uniqStamp.Value // USE OF incr is DEPRECATED
+                        let stamp = uniqStamp.Value <- uniqStamp.Value + 1; uniqStamp.Value
+                        let prop = Prop stamp
+                        fwdTable.Add (repr, prop)
+                        bwdTable.Add (stamp, repr)
+                        prop
+
+                member t.FromUnique (Prop stamp) =
+                    bwdTable.[stamp]
+                        
+            let internal table = PropTable ()
+
+            // public construction functions
+            let And (p1, p2) = table.ToUnique (AndRepr (p1, p2))
+            let Not p = table.ToUnique (NotRepr p)
+            let Or (p1, p2) = table.ToUnique (OrRepr (p1, p2))
+            let Var p = table.ToUnique (VarRepr p)
+            let True = table.ToUnique TrueRepr
+            let False = Not True
+
+            let (|And|Or|Not|Var|True|) prop =
+                match table.FromUnique prop with
+                | AndRepr (x, y) -> And (x, y)
+                | OrRepr (x, y) -> Or (x, y)
+                | NotRepr x -> Not x
+                | VarRepr x -> Var x
+                | TrueRepr -> True
+
+            // deconstruction function
+            let getRepr p = table.FromUnique p                    
+        
+        open PropOps
+
+        let rec showProp precedence prop =
+            let parenIfPrec lim s = if precedence < lim then "(" + s + ")" else s
+            match prop with
+            | Or (p1, p2) ->
+                parenIfPrec 4 (showProp 4 p1 + " || " + showProp 4 p2)
+            | And (p1, p2) ->
+                parenIfPrec 4 (showProp 3 p1 + " && " + showProp 3 p2)
+            | Not p ->
+                parenIfPrec 2 (" not " + showProp 1 p)
+            | Var v -> v
+            | True -> "T"
+
+        let rec nnf sign prop =
+            match prop with
+            | And (p1, p2) ->
+                if sign then And (nnf sign p1, nnf sign p2)
+                else Or (nnf sign p1, nnf sign p2)
+            | Or (p1, p2) ->
+                if sign then Or (nnf sign p1, nnf sign p2)
+                else And (nnf sign p1, nnf sign p2)
+            | Not p ->
+                nnf (not sign) p
+            | Var _ | True ->
+                if sign then prop else Not prop
+
+        let NNF prop = nnf true prop
+
+        let run () = 
+            let t1 = Not(And(Not(Var("x")),Not(Var("y"))))
+
+            showProp 5 |> printfn "%A"
+            showProp 5 |> printfn "%O"
+
+            let t2 = Or(Not(Not(Var("x"))), Var("y"))
+
+            (t1 = t2) |> printfn "%A"
+            (t1 = t2) |> printfn "%O"
+
+            NNF t1 |> printfn "%A"
+            NNF t1 |> printfn "%O"
+
+            NNF t2 |> printfn "%A"
+            NNF t2 |> printfn "%O"
+
+            (NNF t1 = NNF t2) |> printfn "%A"
+            (NNF t1 = NNF t2) |> printfn "%O"
+
+            ()
+
     module execute_modules =
 
         let run () =
@@ -484,5 +818,9 @@ module chapter_9
             selecting_multiple_elements_from_sequences.run()
             finding_elements_and_indexes_in_sequences.run()
             grouping_and_indexeing_sequences.run()
-            // BUGGY - IT CRASHES // structure_beyond_sequences_working_with_trees.run() 
+            // BUGGY // structure_beyond_sequences_working_with_trees.run() 
+            memoizing_construction_of_syntax_tree_nodes.run()
+            converting_the_same_data_to_many_views.run()
+            defining_partial_and_parameterize_active_patterns.run()
+            hiding_abstract_syntax_implementations_with_active_patterns.run()
 
