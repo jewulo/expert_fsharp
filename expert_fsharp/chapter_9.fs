@@ -623,9 +623,6 @@ module chapter_9
             match c5 with | Rect (x, y) -> printfn "x = %g, y = %g" x y
             match c5 with | Polar (x, y) -> printfn "x = %g, y = %g" x y
 
-    /// CONTINUE FROM CHAPTER 9
-    /// PAGE 216
-    /// SECTION: EQUALITY, HASHING AND COMPARISISON FOR NEW STRUCTURED DATA TYPES
     module matching_on_dotnet_object_types =
         open System
 
@@ -802,6 +799,10 @@ module chapter_9
             (NNF t1 = NNF t2) |> printfn "%O"
 
             ()
+
+    /// CONTINUE FROM CHAPTER 9
+    /// PAGE 216
+    /// SECTION: EQUALITY, HASHING AND COMPARISISON FOR NEW STRUCTURED DATA TYPES
 
     module execute_modules =
 
