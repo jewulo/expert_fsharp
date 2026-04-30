@@ -757,7 +757,7 @@ module chapter_9
             | Or (p1, p2) ->
                 parenIfPrec 4 (showProp 4 p1 + " || " + showProp 4 p2)
             | And (p1, p2) ->
-                parenIfPrec 4 (showProp 3 p1 + " && " + showProp 3 p2)
+                parenIfPrec 3 (showProp 3 p1 + " && " + showProp 3 p2)
             | Not p ->
                 parenIfPrec 2 (" not " + showProp 1 p)
             | Var v -> v
@@ -800,9 +800,268 @@ module chapter_9
 
             ()
 
+    module asserting_equality_hashing_and_comparison_using_attributes =
+        
+        [<StructuralEquality; StructuralComparison>]
+        type MiniIntegerContainer = MiniIntegerContainer of int
+
+
+        // ERROR: FS1177
+        // The type System.FtpStyleUriParser does not satisfy the 'comparison' constraint
+        // required by StructuralComparison.
+        // Fix: remove StructuralComparison from this union type so the compiler won't
+        // require all components to support comparison.
+        //
+        // [<StructuralEquality; StructuralComparison>]
+        // type MyData = MyData of int * string * string * System.FtpStyleUriParser
+
+        let run () = ()
+
+    module fully_customizing_equality_hashing_and_comparison_on_a_type =
+
+        /// A type abbreviation indicating we are using integers
+        /// for unique stamps on integers
+        type stamp = int
+
+        /// A structural type containing a function that can't be
+        /// compared for equality
+        [<CustomEquality; CustomComparison>]
+        type MyThing =
+            {   Stamp : stamp;
+                Behaviour : (int -> int)    }
+
+            override x.Equals (yobj: obj): bool = 
+                match yobj with
+                | :? MyThing as y -> (x.Stamp = y.Stamp)
+                | _ -> false
+
+            override x.GetHashCode (): int = hash x.Stamp
+            interface System.IComparable with
+                member x.CompareTo (yobj: obj): int = 
+                    match yobj with
+                    | :? MyThing as y -> compare x.Stamp y.Stamp
+                    | _ -> invalidArg "yobj" "cannot compare values of different types"
+
+        let inline equalsOn f x (yobj : obj) =
+            match yobj with
+            | :? 'T as y -> (f x = f y)
+            | _ -> false
+
+        let inline hashOn f x = hash (f x)
+
+        let inline compareOn f x (yobj : obj) =
+            match yobj with
+            | :? 'T as y -> compare (f x) (f y)
+            | _ -> invalidArg "yobj" "cannot compare values of different types"
+
+        /// Another structural type
+        [<CustomEquality; CustomComparison>]
+        type MyUnionType =
+            | MyUnionType of stamp * (int -> int)
+
+            static member Stamp (MyUnionType (s, _)) = s
+
+            override x.Equals y = equalsOn MyUnionType.Stamp x y
+            override x.GetHashCode (): int = hashOn MyUnionType.Stamp x
+            interface System.IComparable with
+                member x.CompareTo y: int = compareOn MyUnionType.Stamp x y
+
+        [<ReferenceEquality>]
+        type MyStyleWrapper = MyStyleWrapper of System.FtpStyleUriParser * (int -> int)
+
+        let run () =
+            let s: stamp = 1
+            let f = fun (x : int) -> x + 1
+            let mp = MyUnionType (s, f)
+
+            MyUnionType.Stamp(mp) |> printfn "%d"
+            ()
+
+    module suppressing_equality_hashing_and_comparison_on_a_type =
+
+        [<NoEquality; NoComparison>]
+        type MyProjections =
+            | MyProjections of (int * string) * (int -> int)
+
+        let run () =
+            let t = (1, "string 1")
+            let f = fun (x : int) -> x + 1
+            let mp = MyProjections (t, f)            
+            ()
+
+    module customizing_generic_collection_types_1 =
+
+        type Graph<'Node when 'Node : equality>() = class end
+        
+        type MiniContainer<'T> = MiniContainer of 'T
+
+        let run () = ()
+
+    module customizing_generic_collection_types_2 =
+        
+        type MiniContainer<[<EqualityConditionalOn; ComparisonConditionalOn>]'T> (x : 'T)=
+            member x.Value = x
+            override x.Equals (yobj) = 
+                match yobj with
+                | :? MiniContainer<'T> as y -> Unchecked.equals x.Value y.Value
+                | _ -> false
+
+            override x.GetHashCode (): int = Unchecked.hash x.Value
+
+            interface System.IComparable with
+                member x.CompareTo yobj = 
+                    match yobj with
+                    | :? MiniContainer<'T> as y -> Unchecked.compare x.Value y.Value
+                    | _ -> invalidArg "yobj" "cannot compare values of different types"
+
+        let run () = ()
+
+    module tail_calls_and_recursive_programming =
+        
+        let rec deepRecursion n =
+            if n = 1000000 then () else 
+            if n % 100 = 0 then
+                printfn "--> deepRecursion, n = %d" n
+            deepRecursion (n+1)
+            printfn "<-- deepRecursion, n = %d" n   // this extra print prevents tail recursion optimisation
+
+        // F# optimises tail recursion into a loop
+        let rec tailRecursion n =
+            if n = 1000000 then ()
+            else if n % 100 = 0 then
+                printfn "--> tailRecursion, n = %d" n
+            tailRecursion (n+1) // tail recursive call
+
+        let run () =
+            deepRecursion 0 // Stack overflow. Repeated 13694 times:
+            tailRecursion 0
+            ()
+
+    module tail_recursion_and_list_processing =
+        
+        // F# optimises tail recursion into a loop
+        let rec last l =
+            match l with
+            | [] -> invalidArg "l" "the input list should not be empty"
+            | [h] -> h
+            | h :: t -> last t
+
+        let rec replicateNotTailRecursiveA n x =
+            if n <= 0 then []
+            else x :: replicateNotTailRecursiveA (n - 1) x
+
+        let rec replicateNotTailRecursiveB n x =
+            if n <= 0 then []
+            else
+                let recursiveResult = replicateNotTailRecursiveB (n - 1) x
+                x :: recursiveResult
+
+        // the solution is to write the function using an accumulated parameter
+        let rec replicateAux n x acc =
+            if n <= 0 then acc
+            else replicateAux (n - 1) x (x :: acc)
+
+        let replicate1 n x = replicateAux n x []
+
+        // you can use an inner function to accumulate the result
+        let replicate2 n x =
+            let rec loop i acc =
+                if i >= n then acc
+                else loop (i + 1) (x :: acc)
+            loop 0 []
+
+        // a non-tail recursive version of map
+        let rec mapNotTailRecursive f inputList =
+            match inputList with
+            | [] -> []
+            | h :: t -> (f h) :: mapNotTailRecursive f t
+
+        // incorrect tail recursive version with output reverse
+        let rec mapIncorrectAcc f inputList acc =
+            match inputList with
+            | [] -> acc     // whoops! forgot to reverse the accumulator here!
+            | h :: t -> mapIncorrectAcc f t (f h :: acc)
+
+        let mapIncorrect f inputList = mapIncorrectAcc f inputList []
+
+        // correct implementation
+        let rec mapAcc f inputList acc =
+            match inputList with
+            | [] -> List.rev acc
+            | h :: t -> mapAcc f t (f h :: acc)
+
+        let map f inputList = mapAcc f inputList []
+
+        let run () =
+            last [1; 2; 3; 4; 5; 6; 7; 8; 9; 10] |> printfn "%d"
+            replicateNotTailRecursiveA 4 1 |> printfn "%A"
+            replicateNotTailRecursiveB 5 2 |> printfn "%A"
+            replicate1 6 3 |> printfn "%A"
+            replicate2 7 4 |> printfn "%A"
+
+            mapNotTailRecursive (fun x -> x * x) [1; 2; 3; 4] |> printfn "%A"
+            mapIncorrectAcc (fun x -> x * x) [1; 2; 3; 4] |> printfn "%A"
+            map (fun x -> x * x) [1; 2; 3; 4] |> printfn "%A"
+
+            ()
+
+    module tail_recursion_and_object_oriented_programming =
+
+        type Chain =
+            | ChainNode of int * string * Chain
+            | ChainEnd of string
+
+            // non-tail recursive member
+            member chain.LengthNotTailRecursive =
+                match chain with
+                | ChainNode (_, _, subChain) -> 1 + subChain.LengthNotTailRecursive
+                | ChainEnd _ -> 0
+
+            // tail recursive member
+            member chain.Length =
+                let rec loop c acc =
+                    match c with
+                    | ChainNode (_, _, subChain) -> loop subChain (acc + 1)
+                    | ChainEnd _ -> acc
+                loop chain 0
+
+        let run () =
+            let cend = ChainEnd("end")
+            let c1 = ChainNode(1, "one", cend)
+            let c2 = ChainNode(1, "one", ChainNode (1, "two", cend))
+            let c3 = ChainNode(1, "one", ChainNode (2, "two", ChainNode (3, "three", cend)))
+            
+            c1 |> printfn "%A"
+            c1.LengthNotTailRecursive |> printfn "%d"
+            c1.Length |> printfn "%d"
+
+            c2 |> printfn "%A"
+            c2.LengthNotTailRecursive |> printfn "%d"
+            c2.Length |> printfn "%d"
+
+            c3 |> printfn "%A"
+            c3.LengthNotTailRecursive |> printfn "%d"
+            c3.Length |> printfn "%d"
+
     /// CONTINUE FROM CHAPTER 9
-    /// PAGE 216
-    /// SECTION: EQUALITY, HASHING AND COMPARISISON FOR NEW STRUCTURED DATA TYPES
+    /// PAGE 226 : SECOND PARAGRAPH
+    /// SECTION: TAIL RECURSION AND PROCESSING UNBALANCED TREES
+
+    module tail_recursion_and_processing_unbalanced_trees =
+
+        type Tree =
+            | Node of string * Tree * Tree
+            | Tip of string
+
+            // non-tail recursive member
+        let rec sizeNotTailRecursive tree =
+            match tree with            
+            | Tip _ -> 0
+            | Node (_, treeLeft, treeRight) ->
+                sizeNotTailRecursive treeLeft + sizeNotTailRecursive treeRight
+
+        let run () =
+            ()
 
     module execute_modules =
 
@@ -824,4 +1083,11 @@ module chapter_9
             converting_the_same_data_to_many_views.run()
             defining_partial_and_parameterize_active_patterns.run()
             hiding_abstract_syntax_implementations_with_active_patterns.run()
+            asserting_equality_hashing_and_comparison_using_attributes.run()
+            fully_customizing_equality_hashing_and_comparison_on_a_type.run()
+            suppressing_equality_hashing_and_comparison_on_a_type.run()
+            tail_calls_and_recursive_programming.run()
+            tail_recursion_and_list_processing.run()
+            tail_recursion_and_object_oriented_programming.run()
+            tail_recursion_and_processing_unbalanced_trees.run()
 
