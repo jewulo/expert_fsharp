@@ -1053,15 +1053,162 @@ module chapter_9
             | Node of string * Tree * Tree
             | Tip of string
 
-            // non-tail recursive member
+        // non-tail recursive member
         let rec sizeNotTailRecursive tree =
             match tree with            
-            | Tip _ -> 0
+            | Tip _ -> 1
             | Node (_, treeLeft, treeRight) ->
                 sizeNotTailRecursive treeLeft + sizeNotTailRecursive treeRight
 
-        let run () =
-            ()
+        let rec mkBigUnbalancedTree n tree =
+            if n = 0 then tree
+            else Node ("node", Tip("tip"), mkBigUnbalancedTree (n - 1) tree)
+        
+        let run_not_tail_recursive() =
+            let tree1 = Tip("tip")
+            let tree2 = mkBigUnbalancedTree 15000 tree1
+            let tree3 = mkBigUnbalancedTree 15000 tree2
+            let tree4 = mkBigUnbalancedTree 15000 tree3
+            let tree5 = mkBigUnbalancedTree 15000 tree4
+            let tree6 = mkBigUnbalancedTree 15000 tree5
+
+            sizeNotTailRecursive tree1 |> printfn "%d"  // 1
+            sizeNotTailRecursive tree2 |> printfn "%d"  // 15001
+            //sizeNotTailRecursive tree3 |> printfn "%d"  // Stack overflow. Repeated 13710 times:
+            //sizeNotTailRecursive tree4 |> printfn "%d"
+            //sizeNotTailRecursive tree5 |> printfn "%d"
+            //sizeNotTailRecursive tree6 |> printfn "%d"
+
+        let rec sizeAcc acc tree =
+            match tree with
+            | Tip _ -> 1 + acc
+            | Node(_, treeLeft, treeRight) ->
+                let acc = sizeAcc acc treeLeft
+                sizeAcc acc treeRight
+
+        let size tree = sizeAcc 0 tree
+
+        let run_tail_recursive() = 
+            let tree1 = Tip("tip")
+            let tree2 = mkBigUnbalancedTree 15000 tree1
+            let tree3 = mkBigUnbalancedTree 15000 tree2
+            let tree4 = mkBigUnbalancedTree 15000 tree3
+            let tree5 = mkBigUnbalancedTree 15000 tree4
+            let tree6 = mkBigUnbalancedTree 15000 tree5
+
+            size tree1 |> printfn "%d"  // 1
+            size tree2 |> printfn "%d"  // 15001
+            size tree3 |> printfn "%d"  // 30001
+            size tree4 |> printfn "%d"  // 45001
+            size tree5 |> printfn "%d"  // 60001
+            size tree6 |> printfn "%d"  // 75001
+
+        let run () = 
+            run_not_tail_recursive ()
+            run_tail_recursive ()
+
+        /// CONTINUE FROM CHAPTER 9
+    /// PAGE 227
+    /// SECTION: USING CONTINUATION PASSING STYLE
+
+    module using_continuations_to_avoid_stack_overflows =
+
+        type Tree =
+            | Node of string * Tree * Tree
+            | Tip of string
+
+        let rec sizeCont tree cont =
+            match tree with
+            | Tip _ -> cont 1
+            | Node(_, treeLeft, treeRight) ->
+                sizeCont treeLeft (fun leftSize ->
+                    sizeCont treeRight (fun rightSize ->
+                        cont (leftSize + rightSize)))
+
+        let size tree = sizeCont tree (fun x -> x)
+
+        // note that the first continuation is the identity function
+        let id = fun x -> x
+        let size1 tree = sizeCont tree id
+
+        let rec mkBigUnbalancedTree n tree =
+            if n = 0 then tree
+            else Node ("node", Tip("tip"), mkBigUnbalancedTree (n - 1) tree)
+
+        // combining continuation passing style with accumulator
+        let rec sizeContAcc acc tree cont =
+            match tree with
+            | Tip _ -> cont (1 + acc)
+            | Node(_, treeLeft, treeRight) ->
+                sizeContAcc acc treeLeft (fun accLeftSize ->
+                sizeContAcc accLeftSize treeRight cont)
+        
+        let size2 tree = sizeContAcc 0 tree (fun x -> x)
+
+        let run() =
+            let tree1 = Tip("tip")
+            let tree2 = mkBigUnbalancedTree 15000 tree1
+            let tree3 = mkBigUnbalancedTree 15000 tree2
+            let tree4 = mkBigUnbalancedTree 15000 tree3
+            let tree5 = mkBigUnbalancedTree 15000 tree4
+            let tree6 = mkBigUnbalancedTree 15000 tree5
+
+            size tree1 |> printfn "%d"  // 1
+            size tree2 |> printfn "%d"  // 15001
+            size tree3 |> printfn "%d"  // 30001  
+            size tree4 |> printfn "%d"  // 45001
+            size tree5 |> printfn "%d"  // 60001
+            size tree6 |> printfn "%d"  // 75001
+
+            size1 tree1 |> printfn "%d"  // 1
+            size1 tree2 |> printfn "%d"  // 15001
+            size1 tree3 |> printfn "%d"  // 30001  
+            size1 tree4 |> printfn "%d"  // 45001
+            size1 tree5 |> printfn "%d"  // 60001
+            size1 tree6 |> printfn "%d"  // 75001
+
+            size2 tree1 |> printfn "%d"  // 1
+            size2 tree2 |> printfn "%d"  // 15001
+            size2 tree3 |> printfn "%d"  // 30001  
+            size2 tree4 |> printfn "%d"  // 45001
+            size2 tree5 |> printfn "%d"  // 60001
+            size2 tree6 |> printfn "%d"  // 75001
+
+    module processing_syntax_trees_using_continuations =
+        
+        type Expr =
+            | Add of Expr * Expr
+            | Bind of string * Expr * Expr
+            | Var of string
+            | Num of int
+
+        type Env = Map<string, int>
+
+        let rec eval1 (env : Env) expr =
+            match expr with
+            | Add (e1, e2) -> eval1 env e1 + eval1 env e2
+            | Bind (var, rhs, body) -> eval1 (env.Add(var, eval1 env rhs)) body
+            | Var var -> env.[var]
+            | Num n -> n
+
+        // eval using continuation passing style
+        let rec evalCont (env : Env) expr cont =
+            match expr with
+            | Add (e1, e2) ->
+                evalCont env e1 (fun v1 ->
+                evalCont env e2 (fun v2 ->
+                cont (v1 + v2)))
+            | Bind (var, rhs, body) ->
+                evalCont env rhs (fun v1 ->
+                evalCont (env.Add(var, v1)) body cont)
+            | Num n ->
+                cont n
+            | Var var ->
+                cont (env.[var])
+            
+        let eval2 env expr = evalCont env expr (fun x -> x)
+        
+        let run () = ()
 
     module execute_modules =
 
@@ -1090,4 +1237,7 @@ module chapter_9
             tail_recursion_and_list_processing.run()
             tail_recursion_and_object_oriented_programming.run()
             tail_recursion_and_processing_unbalanced_trees.run()
+            using_continuations_to_avoid_stack_overflows.run()
+            processing_syntax_trees_using_continuations.run()
 
+            ()
