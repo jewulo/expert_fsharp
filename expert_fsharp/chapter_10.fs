@@ -1,5 +1,10 @@
 module chapter_10
 
+    // on fsi you need to load the following
+    // #load "packages/FSharp.Charting/FSharp.Charting.fsx"
+
+    
+    open Microsoft.FSharp
     open FSharp.Charting
 
     module basic_charting_with_fsharp =
@@ -261,7 +266,6 @@ module chapter_10
             // Create a point near the given point
             let near p= { Time = p.Time + randZ() * 20.0<s>;
                                       Location = p.Location + randZ() * 5.0<m> }
-
             let data =
                 [for i in 1 .. 1000 -> near {Time = 100.0<s>; Location = 60.0<m>}
                  for i in 1 .. 1000 -> near {Time = 120.0<s>; Location = 80.0<m>}
@@ -287,11 +291,198 @@ module chapter_10
 
             ccent_class |> printfn "%A"
             ccent_class_100th |> printfn "%A"
-            
+             
     /// CONTINUE FROM CHAPTER 10
     /// PAGE 244 :
-    /// SECTION: STATISTICS, LINEAR ALGERBRA AND DISTRIBUTIONS WITH MATH.NET
+    /// SECTION: STATISTICS, LINEAR ALGEBRA AND DISTRIBUTIONS WITH MATH.NET
+    module statistics_linear_algebra_and_distributions_with_math_dotnet =
 
+        open MathNet.Numerics.Statistics
+        open MathNet.Numerics.Distributions
+        open System.Collections.Generic
+
+        let histogram n data = 
+            let h = Histogram(data, n)
+            [| for i in 0 .. h.BucketCount - 1 ->
+                (sprintf "%.0f-%.0f" h.[i].LowerBound h.[i].UpperBound, h.[i].Count) |]
+
+        let run () =
+            let data = [for i in 0.0 .. 0.01 .. 10.0 -> sin i]
+            data |> printfn "%A"
+
+            let exampleVariance = data |> Statistics.Variance
+            exampleVariance |> printfn "%f"
+
+            let exampleMean = data |> Statistics.Mean
+            exampleMean |> printfn "%f" 
+
+            let exampleMinimum = data |> Statistics.Minimum
+            exampleMinimum |> printfn "%f"
+
+            let exampleMaximum = data |> Statistics.Maximum
+            exampleMaximum |> printfn "%f"
+
+            let exampleBellCurve = Normal(100.0, 10.0)
+            exampleBellCurve |> printfn "%A"
+            exampleBellCurve.Samples() |> printfn "%A"
+
+            // this is not working
+            exampleBellCurve.Samples()
+                |> Seq.truncate 1000
+                |> histogram 10
+                |> Chart.Column
+                |> Chart.Show
+
+    /// CONTINUE FROM CHAPTER 10
+    /// PAGE 248 :
+    /// SECTION: USING MATRICES AND VECTORS WITH MATH.NET
+    module using_matrices_and_vectors_from_math_dotnet =
+        
+        open MathNet.Numerics
+        open MathNet.Numerics.LinearAlgebra
+        open MathNet.Numerics.LinearAlgebra.Double
+
+        //// THESE fsi invocations do not work
+
+        // Only call PrettyFsi.addPrinters() when running inside FSI/interactive to avoid
+        // introducing a compile-time dependency on FSharp.Compiler.Interactive.Settings.
+        #if INTERACTIVE
+        PrettyFsi.addPrinters()
+        fsi.AddPrintTransformer (fun (x : DenseVector) ->
+            box [|for i in 0 .. x.Count - 1 -> x.[i]|])
+
+        fsi.AddPrintTransformer (fun (x : DenseMatrix) ->
+            box (array2D [for i in 0 .. x.RowCount - 1 ->
+                            [for i in 0 .. x.ColumnCount - 1 -> x.[i, j]]]))
+        #endif
+
+        let working_with_vectors () =
+            let vector1 = vector [1.0; 2.4; 3.0]
+            let vector2 = vector [7.0; 2.1; 5.4]
+            let vector3 = vector1 + vector2
+
+            vector1 |> printfn "vector1 : %A"
+            vector2 |> printfn "vector2 : %A"
+            vector3 |> printfn "vector1 + vector2 : %A"
+
+        let working_with_matrices () =
+            let matrix1 = matrix [[1.0; 2.0]; [1.0; 3.0]]
+            let matrix2 = matrix [[1.0; -2.0]; [0.5; 3.0]]
+            let matrix3 = matrix1 * matrix2
+
+            matrix1 |> printfn "matrix1 : %A"
+            matrix2 |> printfn "matrix2 : %A"
+            matrix3 |> printfn "matrix1 * matrix2 : %A"
+
+        let run () =
+            working_with_vectors()
+            working_with_matrices()
+
+    module matrices_inverses_decompositions_and_eigenvalues =
+        
+        open MathNet.Numerics
+        open MathNet.Numerics.LinearAlgebra
+        open MathNet.Numerics.LinearAlgebra.Double
+        // open MathNet.Numerics.LinearAlgebra.Generic // DOES NOT EXIST
+
+        #if INTERACTIVE
+        PrettyFsi.addPrinters()
+        fsi.AddPrinter (fun (c : System.Numerics.Complex) ->
+            sprintf "%fr + %fi" c.Real c.Imaginary)
+
+        fsi.AddPrintTransformer (fun (x : DenseMatrix) ->
+            box (array2D [for i in 0 .. x.RowCount - 1 ->
+                            [for i in 0 .. x.ColumnCount - 1 -> x.[i, j]]]))
+        #endif
+
+        let rnd = System.Random()
+        let rand () = rnd.NextDouble()
+        
+
+        let run () =
+            let largeMatrix = matrix [ for i in 1 .. 100 -> [for j in 1 .. 100 -> rand()]]
+            let laregMatrixInverse = largeMatrix.Inverse()
+            let check = largeMatrix * largeMatrix.Inverse()
+
+            largeMatrix |> printfn "laregMatrix : %A"
+            laregMatrixInverse |> printfn " laregMatrixInverse : %A"
+            check |> printfn "laregMatrix * laregMatrixInverse : %A"
+
+            let evd = largeMatrix.Evd()
+            let eigenValues = evd.EigenValues
+            let determinant = evd.Determinant
+            let eigenVectors = evd.EigenVectors
+
+            evd |> printfn "laregMatrix.Evd : Factorization : %A"            
+            eigenValues |> printfn "EigenValues : %A"
+            determinant |> printfn "Determinant : %A"
+            eigenVectors |> printfn "EigenVectors : %A"
+
+            evd.IsFullRank |> printfn "Is Full Rank? : %b"
+            evd.Rank |> printfn "Rank: : %d"
+            evd.IsSymmetric |> printfn "Is Symmetric? : %b"            
+            evd.D |> printfn "Diagonal EigenValue Matrix : %A"
+
+    /// EXPERT F# 4.0 PAGE 276 :
+    module time_series_and_data_frames_with_deedle =
+
+        open System
+        open Deedle
+        open MathNet.Numerics.Distributions
+
+        let start = DateTimeOffset(DateTime.Today)
+
+        let randomPrice drift volatility initial (span : TimeSpan) count =
+            let dist = Normal(0.0, 1.0, RandomSource = Random())
+            let dt = span.TotalDays / 250.0
+            let driftExp = (drift - 0.5 * pown volatility 2) * dt
+            let randExp = volatility * (sqrt dt)
+
+            (start, initial)
+                |> Seq.unfold
+               (fun (dt, price) ->
+                            let price = price * exp (driftExp + randExp * dist.Sample())
+                            Some((dt, price), (dt + span, price)))
+                |> Seq.take count
+
+        let stock1 = randomPrice 0.1 3.0 20.0 (TimeSpan.FromMinutes(1.0)) 500
+        let stock2 = randomPrice 0.2 1.6 20.0 (TimeSpan.FromSeconds(30.0)) 1000
+
+        let run () =
+                // turn the raw data into a time series using the Deedle Library
+            let stockSeries1 = series stock1
+            let stockSeries2 = series stock2
+
+            stockSeries1 |> printfn "%A"
+            stockSeries2 |> printfn "%A"
+
+            let zippedSeriesWhereBothHaveData = stockSeries1.Zip (stockSeries2, JoinKind.Left)
+            zippedSeriesWhereBothHaveData |> printfn "%A"
+
+            let zippedSeriesWhereOneHasData = stockSeries1.Zip (stockSeries2, JoinKind.Right)            
+            zippedSeriesWhereOneHasData |> printfn "%A"
+
+            // Contains value every minute
+            let f1 = Frame.ofColumns ["S1" => stockSeries1]
+            f1 |> printfn "%A"
+
+            // Contains value every 30 seconds
+            let f2 = Frame.ofColumns ["S2" => stockSeries2]
+            f2 |> printfn "%A"
+
+            let alignedData = f1.Join(f2, JoinKind.Outer)
+            alignedData
+
+
+
+
+    /// CONTINUE FROM CHAPTER 10
+    /// EXPERT F# 3.0 :PAGE 250
+    /// EXPERT F# 4.0 :PAGE 279
+    module units_of_measure =
+        open FSharp.Data.JsonExtensions;;
+        let run () = ()
+    
     module execute_modules =
 
         let run () =
@@ -304,4 +495,7 @@ module chapter_10
             writing_fresh_numeric_code_2.run()
             making_numeric_code_generic.run()
             kmeans.run()
-
+            statistics_linear_algebra_and_distributions_with_math_dotnet.run()
+            using_matrices_and_vectors_from_math_dotnet.run()
+            matrices_inverses_decompositions_and_eigenvalues.run()
+            time_series_and_data_frames_with_deedle.run()
