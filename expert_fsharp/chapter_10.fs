@@ -292,9 +292,6 @@ module chapter_10
             ccent_class |> printfn "%A"
             ccent_class_100th |> printfn "%A"
              
-    /// CONTINUE FROM CHAPTER 10
-    /// PAGE 244 :
-    /// SECTION: STATISTICS, LINEAR ALGEBRA AND DISTRIBUTIONS WITH MATH.NET
     module statistics_linear_algebra_and_distributions_with_math_dotnet =
 
         open MathNet.Numerics.Statistics
@@ -333,9 +330,6 @@ module chapter_10
                 |> Chart.Column
                 |> Chart.Show
 
-    /// CONTINUE FROM CHAPTER 10
-    /// PAGE 248 :
-    /// SECTION: USING MATRICES AND VECTORS WITH MATH.NET
     module using_matrices_and_vectors_from_math_dotnet =
         
         open MathNet.Numerics
@@ -473,16 +467,293 @@ module chapter_10
             let alignedData = f1.Join(f2, JoinKind.Outer)
             alignedData
 
-
-
-
-    /// CONTINUE FROM CHAPTER 10
-    /// EXPERT F# 3.0 :PAGE 250
-    /// EXPERT F# 4.0 :PAGE 279
     module units_of_measure =
-        open FSharp.Data.JsonExtensions;;
-        let run () = ()
-    
+        
+        open Microsoft.FSharp.Data.UnitSystems.SI.UnitNames
+        open Microsoft.FSharp.Data.UnitSystems.SI.UnitSymbols
+
+        module intro =
+            // defining a unit of measure using the Measure attribute
+            [<Measure>] type click
+
+            [<Measure>] type pixel
+
+            [<Measure>] type money
+
+            let run () =
+                let rateOfClicks = 200.0<click/s>
+                let durationOfExecution = 3.5<s>
+
+                let numberOfClicks = rateOfClicks * durationOfExecution
+                numberOfClicks |> printfn "%O"
+
+        module adding_units_to_numeric_algorithms =
+
+            module non_unitized =
+                
+                let integrateByMidPointRule f (a, b) = (b - a) * f ((a + b) / 2.0)
+                let integrateByTrapezoidRule f (a, b) = (b - a) * ((f a + f b) / 2.0)
+                let integrateByIterativeRule f (a, b) n =
+                    (b - a) / float n *
+                    ((f a + f b) / 2.0 +
+                      List.sum [for k in 1 .. n - 1 -> f (a + float k * (b - a) / float n)])
+
+                //let cubed x:float = x * x * x
+                let velocityFunction t  = 100.0 + t * -9.81
+
+                let run () =                    
+                    let f1 = integrateByMidPointRule velocityFunction (0.0, 10.0)
+                    printfn "%f" f1
+
+                    let f2 = integrateByTrapezoidRule velocityFunction (0.0, 10.0)
+                    printfn "%f" f2
+
+                    let f3 = integrateByIterativeRule velocityFunction (0.0, 10.0) 10
+                    printfn "%f" f3
+
+            module unitized =
+
+                let integrateByMidPointRule (f : float<'u> -> float<'v>) (a : float<'u>, b : float<'u>) =
+                    (b - a) * f ((a + b) / 2.0)
+
+                let integrateByTrapezoidRule (f : float<'u> -> float<'v>) (a : float<'u>, b : float<'u>) =
+                    (b - a) * ((f a + f b) / 2.0)
+
+                let integrateByIterativeRule  (f : float<'u> -> float<'v>) (a : float<'u>, b : float<'u>)  n =
+                    (b - a) / float n *
+                    ((f a + f b) / 2.0 +
+                      List.sum [for k in 1 .. n - 1 -> f (a + float k * (b - a) / float n)])
+
+                let velocityFunction (t : float<s>) = 100.0<m/s> + t * -9.81<m/s^2>
+
+                let run () =                    
+                    let distance1 = integrateByMidPointRule velocityFunction (0.0<s>, 10.0<s>)
+                    printfn "%f" distance1
+
+                    let distance2 = integrateByTrapezoidRule velocityFunction (0.0<s>, 10.0<s>)
+                    printfn "%f" distance2
+
+                    let distance3 = integrateByIterativeRule velocityFunction (0.0<s>, 10.0<s>) 10
+                    printfn "%f" distance3
+
+            module unitized_variance =
+
+                open MathNet.Numerics.Statistics
+                open MathNet.Numerics.Distributions
+                open System.Collections.Generic
+
+                // for variance to use units you have to use the more abstract Seq type rather than Array type
+                let inline variance (values: seq<float<_>>) =
+                    let sqr x = x * x
+                    let xs = values |> Seq.toArray  // then convert to Array
+                    let avg = xs |> Array.average
+                    let variance = xs |> Array.averageBy (fun x -> sqr (x - avg))
+                    variance
+
+                let inline standardDeviation values =
+                    sqrt (variance values)
+
+                let run () =
+                    let rnd = new System.Random()
+                    let rand() = rnd.NextDouble()
+
+                    // time is labeled in seconds <s>
+                    let sampleTimes = [for x in 0 .. 1000 -> 50.0<s> + 10.0<s> * rand()]
+
+                    // standard deviation is calulated in seconds <s>
+                    let exampleDeviation = standardDeviation sampleTimes
+                    exampleDeviation |> printfn "%f"
+
+                    // variance is calulated in seconds squared <s^2>
+                    let exampleVariance = variance sampleTimes
+                    exampleVariance |> printfn "%f"
+
+            let run () =
+                non_unitized.run()
+                unitized.run()
+                unitized_variance.run()
+
+        let run () = 
+            intro.run()
+            adding_units_to_numeric_algorithms.run()
+
+    module adding_units_to_a_type_definition =
+        
+        //type Vector2D<[<Measure>] 'u> = {DX : float<'u>; DY : float<'u>}
+
+        // defined to be used to test this module
+        [<Measure>] type m
+        [<Measure>] type sec
+        [<Measure>] type kg
+
+        /// Two-dimensional vectors
+        type Vector2D<[<Measure>] 'u> (dx : float<'u>, dy : float<'u>) =
+
+            /// Get the X component of the vector
+            member v.DX = dx
+
+            /// Get the Y component of the vector
+            member v.DY = dy
+
+            /// Get the length of the vector
+            member v.Length = sqrt(dx * dx + dy * dy) 
+
+            /// Get a vector scaled by the given factor k
+            member v.Scale k = Vector2D(k * dx, k * dy)
+
+            /// Return a vector shifted by the given delta in the X coordinate
+            member v.ShiftX x = Vector2D(dx + x, dy)
+
+            /// Return a vector shifted by the given delta in the Y coordinate
+            member v.ShiftY y = Vector2D(dx, y * dy)
+
+            /// Get the zero vector
+            static member Zero = Vector2D<'u>(0.0<_>, 0.0<_>)
+
+            /// Return a constant vector along the X coordinate
+            static member ConstX dx = Vector2D<'u>(dx, 0.0<_>)
+
+            /// Return a constant vector along the Y coordinate
+            static member ConstY dy = Vector2D<'u>(0.0<_>, dy)
+
+            /// Return a the sum of two vectors
+            static member (+) (v1 : Vector2D<'u>, v2 : Vector2D<'u>) =
+                Vector2D(v1.DX + v2.DX, v1.DY + v2.DY)
+
+            /// Return a the difference of two vectors
+            static member (-) (v1 : Vector2D<'u>, v2 : Vector2D<'u>) =
+                Vector2D(v1.DX - v2.DX, v1.DY - v2.DY)
+
+            /// Return a the pointwise-product of two vectors
+            static member (.*) (v1 : Vector2D<'u>, v2 : Vector2D<'u>) =
+                Vector2D(v1.DX * v2.DX, v1.DY * v2.DY)
+
+            /// This enables the Vector2D to be printed ot to console easily:
+            /// THIS IS NOT IN THE BOOK.
+            override v.ToString() = sprintf "[%f,%f]" dx dy
+            
+        let run () =
+            let d1 = Vector2D<m>(1.0<m>, 2.0<m>)
+            let d2 = Vector2D<m>(4.0<m>, 2.0<m>)
+
+            d1.Length |> printfn "%A"
+
+            let d3 = d1 + d2
+            d3 |> printfn "%A"
+
+            let d4 = d1 - d2
+            d4 |> printfn "%A"
+
+            let d5 = d1 .* d2
+            d5 |> printfn "%A"
+
+    module applying_and_removing_units =
+        
+        [<Measure>] type kg
+
+        let run () =            
+            let three = float 3.0<kg>
+            let sixKg = LanguagePrimitives.FloatWithMeasure<kg> (three + three)
+
+            three |> printfn "%A"
+            sixKg |> printfn "%A"
+
+    /// CONTINUE FROM CHAPTER 10 UNITIZING KMEANS
+    /// EXPERT F# 3.0 :PAGE 255
+    /// EXPERT F# 4.0 :PAGE 284
+    module exercise_unitizing_kmeans =
+        
+        type Input<'T, [<Measure>] 'u> =
+            {   Data : 'T
+                Features : float<'u>[] }
+
+        type Centroid<[<Measure>] 'u> = float<'u>[]
+
+        module Array =
+            /// Like Seq.groupBy, but returns arrays
+            /// xs : _[] implies xs is a generic array
+            let classifyBy f (xs : _[]) =
+                xs |> Seq.groupBy f |> Seq.map (fun (k,v) -> (k, Seq.toArray v)) |> Seq.toArray
+
+        module Seq =
+            /// Return x, f(x), f(f(x)), f(f(f(x))), .... 
+            let iterate f x = x |> Seq.unfold (fun x -> Some (x, f x))
+
+        /// Compute the norm distance between an input and a centroid
+        let distance (xs : Input<_,_>) (ys : Centroid<_>) =
+            (xs.Features, ys)
+                ||> Array.map2 (fun x y -> (x - y) * (x - y))
+                |> Array.sum
+
+        /// Find the average set of inputs. First compute xs1 + ... +xsN, pointwise,
+        /// then divide each element of the sum by the number of inputs.
+        let computeCentroidOfGroup (_, group : Input<_,_>[]) =
+            let e0 = group.[0].Features
+            [| for i in 0 .. e0.Length - 1 -> group |> Array.averageBy (fun e -> e.Features.[i]) |]
+
+        /// Group all the inputs by the nearest centroid
+        let classifyIntoGroups inputs centroids =
+            inputs |> Array.classifyBy (fun v -> centroids |> Array.minBy (distance v))
+
+        /// Repeatedly classify the inputs, starting with the initial centroids
+        let rec computeCentroids inputs centroids =
+            seq {
+                let classification = classifyIntoGroups inputs centroids
+                yield classification
+
+                let newCentroids = Array.map computeCentroidOfGroup classification
+                yield! computeCentroids inputs newCentroids
+            }
+
+        /// Extract the features and repeatedly classify the inputs, starting with the
+        /// initial centroids
+        let kmeans inputs featuresExtractor initialCentroids =
+            let inputs =
+                inputs
+                |> Seq.map (fun i -> {Data = i; Features = featuresExtractor i})
+                |> Seq.toArray
+            let initialCentroids = initialCentroids |> Seq.toArray
+            computeCentroids inputs initialCentroids
+
+        /// Generate a synthetic input data set that features four clusters of data
+        open Microsoft.FSharp.Data.UnitSystems.SI.UnitSymbols
+
+        type Observation = { Time : float<s>; Location : float<m> }
+
+        let rnd = System.Random()
+        let rand () = rnd.NextDouble()
+        let randZ () = rnd.NextDouble() - 0.5
+        
+        let run () =
+            // Create a point near the given point
+            let near p= { Time = p.Time + randZ() * 20.0<s>;
+                                      Location = p.Location + randZ() * 5.0<m> }
+            let data =
+                [for i in 1 .. 1000 -> near {Time = 100.0<s>; Location = 60.0<m>}
+                 for i in 1 .. 1000 -> near {Time = 120.0<s>; Location = 80.0<m>}
+                 for i in 1 .. 1000 -> near {Time = 180.0<s>; Location = 30.0<m>}
+                 for i in 1 .. 1000 -> near {Time = 70.0<s>; Location = 40.0<m>}]
+
+            let maxTime = data |> Seq.maxBy (fun p -> p.Time) |> fun p -> p.Time
+            let maxLoc = data |> Seq.maxBy (fun p -> p.Location) |> fun p -> p.Location
+
+            let initialCentroids = [ for i in 0 .. 9 -> [|rand(); rand()|] ]
+            let featureExtractor (p : Observation) =
+                [| p.Time / maxTime; p.Location / maxLoc|]
+
+            // Gives an infinite sequence of centroid/classification representing
+            // repeated iterations of the algorithm.
+            let ccent_class =
+                kmeans data featureExtractor initialCentroids
+
+            // Take only the 100th iteration of the algorithm, and renormalise
+            let ccent_class_100th =
+                kmeans data featureExtractor initialCentroids
+                    |> Seq.map (Array.map (fun (c, _) -> c.[0] * maxTime, c.[1] * maxLoc))
+
+            ccent_class |> printfn "%A"
+            ccent_class_100th |> printfn "%A"
+
     module execute_modules =
 
         let run () =
@@ -499,3 +770,7 @@ module chapter_10
             using_matrices_and_vectors_from_math_dotnet.run()
             matrices_inverses_decompositions_and_eigenvalues.run()
             time_series_and_data_frames_with_deedle.run()
+            units_of_measure.run()
+            adding_units_to_a_type_definition.run()
+            applying_and_removing_units.run()
+            exercise_unitizing_kmeans.run()
