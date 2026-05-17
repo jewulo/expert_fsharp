@@ -4,15 +4,23 @@ module chapter_11
 
     module events =
         open System.Windows
+        // open System.Windows.Forms // THIS NAME SPACE DOESN'T EXSIST.
 
         //let form = new Form()
         let run() = ()
 
     module events_as_first_class_values =
+        open System.Windows
+        // open System.Windows.Forms // THIS NAME SPACE DOESN'T EXSIST.
+
+        //let form = new Form()
+
         let run() = ()
 
     module creating_and_publishing_events =
         open System.Timers
+        open System.Windows
+        // open System.Windows.Forms // THIS NAME SPACE DOESN'T EXSIST.
 
         type RandomTicker (approxInterval) =
 
@@ -54,7 +62,9 @@ module chapter_11
     /// EXPERT F# 3.0 :PAGE 262 - Using and Designing Background Worker
     /// EXPERT F# 4.0 :PAGE 284 - Events as First-Class Values
 
-    module execute_modules =    
+    /// ABANDONED CHAPTER 11 BECAUSE OF ALL THE IO REQUIREMENTS.
+    /// MOVING ON TO CHAPTER 12
+    module execute_modules =
         let run() =
-            creating_and_publishing_events.run();;
+            creating_and_publishing_events.run()
 
