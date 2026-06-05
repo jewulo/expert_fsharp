@@ -2,10 +2,6 @@ module chapter_12_sym_diff
 
     open System
 
-    /// CONTINUE FROM CHAPTER 12: SYMBOLIC DIFFERENTIATION AND EXPRESSION RENDERING
-    /// EXPERT F# 3.0 :PAGE 309 - Symbolic Differentiaion and Expression Rendering 
-    /// EXPERT F# 4.0 :PAGE 332 - Expression Simplification and Differentiation
-
     module modelling_simple_algebraic_expressions =
         type Expr =
             | Var
@@ -90,29 +86,38 @@ module chapter_12_sym_diff
 
         let simpSum = function
             | Num n, Num m -> Num (n+m)          // constants
-            | Num 0, e | e, Num 0 -> Num 0      // 0+e = e+0 = e
+            | Num 0, e | e, Num 0 -> e          // 0+e = e+0 = e
             | e1, e2 -> Sum (e1, e2)
 
-    /// CONTINUE FROM CHAPTER 12: SYMBOLIC DIFFERENTIATION AND EXPRESSION RENDERING
-    /// EXPERT F# 3.0 :PAGE 312 - Implementing Local Simplifications 
-    /// EXPERT F# 4.0 :PAGE 332 - Expression Simplification and Differentiation
+        let simpProd = function
+            | Num n, Num m -> Num (n*m)          // constants
+            | Num 0, e | e, Num 0 -> Num 0      // 0*e = 0
+            | Num 1, e | e, Num 1 -> e          // 1*e = e*1 = e
+            | e1, e2 -> Prod (e1, e2)
+
+        let rec simpDerive = function
+            | Var               -> Num 1
+            | Num _             -> Num 0
+            | Sum (e1, e2)  -> simpSum (simpDerive e1, simpDerive e2)
+            | Prod (e1, e2) -> simpSum (simpProd (e1, simpDerive e2),
+                                                    simpProd (e2, simpDerive e1))
 
         let run () =
             let e1 = Sum (Num 1, Prod (Num 2, Var))
             e1 |> printfn "%A"
-            derive e1 |> printfn "%A"            
+            simpDerive e1 |> printfn "%A"            
             stringOfExpr 0 e1 |> printfn "%A"
-            stringOfExpr 0 (derive e1)  |> printfn "%A"
+            stringOfExpr 0 (simpDerive e1)  |> printfn "%A"
 
             let e2 = Prod (Var, Prod (Var, Num 2))
             e2 |> printfn "%A"
-            derive e2 |> printfn "%A"            
+            simpDerive e2 |> printfn "%A"            
             stringOfExpr 0 e2 |> printfn "%A"
-            stringOfExpr 0 (derive e2)  |> printfn "%A"
+            stringOfExpr 0 (simpDerive e2)  |> printfn "%A"
 
     module execute_modules =
         let run () =
             modelling_simple_algebraic_expressions.run()
-
+            implementing_local_simplifications.run()
 
 
