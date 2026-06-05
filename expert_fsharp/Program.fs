@@ -11,23 +11,28 @@ let pause () =
     match System.Diagnostics.Debugger.IsAttached with  
     | true ->  
         printfn "\nPress any key to continue."  
-        System.Console.ReadKey(true) |> ignore  
+        System.Console.ReadKey true |> ignore  
     | false -> ()  
-
 
 [<EntryPoint>]
 let main argv =
     printfn "Expert F#: Hello from main. Args: %A" argv
-    
+
     //chapter_2.execute_modules.run()
     //chapter_3.execute_modules.run()
     //chapter_4.execute_modules.run()
     //chapter_5.execute_modules.run()
     //chapter_6.execute_modules.run()
     //chapter_7.execute_modules.run()
-    chapter_8.execute_modules.run()
-    chapter_9.execute_modules.run()
+    //chapter_8.execute_modules.run()
+    //chapter_9.execute_modules.run()
+    //chapter_10.execute_modules.run()
+    //chapter_11.execute_modules.run()
+    //chapter_12.execute_modules.run()
+    chapter_12_sym_diff.execute_modules.run()
+    chapter_12_rlae.execute_modules.run()
 
-    System.Console.ReadKey(true) |> ignore  
+    System.Console.ReadKey true |> ignore
+
     pause()  
     0 // exit codeopen System
